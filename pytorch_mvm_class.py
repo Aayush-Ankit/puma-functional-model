@@ -18,10 +18,7 @@ class Conv2d_mvm_function(Function):
     # |            MVM           |   
     # +--------------------------+
     def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1):
-        #output = F.conv2d(input, weight,  bias, stride, padding, dilation, groups)
         
-        print(padding)
-        """"""
         weight_channels_out = weight.shape[0]
         weight_channels_in = weight.shape[1]
         weight_row = weight.shape[2]
@@ -36,7 +33,7 @@ class Conv2d_mvm_function(Function):
         input_row = input.shape[2] + padding[0]*2
         input_col = input.shape[3] + padding[1]*2
         input_pad = np.zeros((input_batch, input_channels, input_row, input_col))
-        input_pad[:,:,1:-1,1:-1] = input
+        input_pad[:,:,padding[0]:input_row-padding[0],padding[1]:input_col--padding[1]] = input
         
         output_row = input_row - weight_row + 1
         output_col = input_col - weight_col + 1 
@@ -55,9 +52,8 @@ class Conv2d_mvm_function(Function):
 
         ## Need to do: 
         ## 1. Bias
-        ## 2. Separate inputs/weights with  Crossbar size
+        ## 2. Separate inputs/weights with Crossbar size (128x128)?
 
-        """"""
         ctx.save_for_backward(input, weight, bias)
         ctx.stride = stride
         ctx.padding = padding 
@@ -93,7 +89,7 @@ class Conv2d_mvm_function(Function):
         if bias is not None and ctx.needs_input_grad[2]:
             grad_bias = grad_output.sum((0,2,3)).squeeze(0)
             
-
+        print(grad_weight)
         return grad_input, grad_weight, grad_bias, None, None, None, None
 
 

@@ -10,7 +10,7 @@ import torch.nn as nn
 ##   sign  integer              fraction
 ##
 
-# float --> 16bit fixed point
+# float --> 16bit fixed point. ex) [1, 0, 1, 0, 0, ..., 0, 1]
 def float_to_16bits(number):
     if number >= 8 or number < -8:
         print("fixed-point 16bit number should be in -8 <= x < 8")
@@ -83,6 +83,7 @@ def bits_to_uint(bits):
         
     return number  
 
+# Function of ADC
 def uint_to_bits(number, nbits=9): # adc produce 9-bits
     
     bits = np.zeros(nbits)
@@ -142,7 +143,7 @@ def binary_subtract(a,b):  #a-b
         i-=1  
     return output  
 
-# Set Bit sliced weights as integer arrays 
+# Return Bit sliced weights as integer arrays 
 # Because the current of each bitline of crossbar is analog value
 def bit_slice_weight(weights, nbit): # weights --> 16-bit fixed-point --> nbit (nbit%2 => 0)
   weights = torch.transpose((weights),1,0)
@@ -160,6 +161,8 @@ def bit_slice_weight(weights, nbit): # weights --> 16-bit fixed-point --> nbit (
   return bit_sliced_weights
 
 
+# Return output for 1 bit input.
+# Values after ADC are shifted and added --> value for Output Register
 def adc_shift_n_add(adc_out, nbits=2): # shift and add 8 x 9bit after adc (unsigned)
     n_cells = adc_out.shape[0]
     adc_bits = adc_out.shape[1]
@@ -167,30 +170,32 @@ def adc_shift_n_add(adc_out, nbits=2): # shift and add 8 x 9bit after adc (unsig
     output_bit_len = int(adc_bits + nbits*(n_cells-1)) #23
     output = np.zeros(output_bit_len)
     output2 = np.zeros(output_bit_len)
-    output[0:adc_bits] = adc_out[n_cells-1]
-    
+
+    output[:adc_bits] = adc_out[n_cells-1]
     for i in range(1,n_cells):
         
         # shift right nbits
-        output[nbits:output_bit_len] = output[0:output_bit_len-nbits]
+        output[nbits:output_bit_len] = output[:output_bit_len-nbits]
         for j in range(nbits):
             output[j] = 0
         
         # add
-        output2[0:9] = adc_out[n_cells-1-i]
+        output2[:adc_bits] = adc_out[n_cells-1-i]
         output = binary_add(output, output2)
     return output
 
 
 # 1 input set: fixed-point array [n x 16], 
-# 1 weight set: Bitsliced float array [n x 16/nbit] 
-# --> output: 1 number
+# 1 weight set: Bitsliced float array [n x (16/nbit)] 
+# --> output: 1 float number
 def mvm_simple(input_bits, bit_sliced_weights):  
     
+    adc_bit = 9
     n_cell = bit_sliced_weights.shape[1]  # 8
     nbits = int(16/n_cell) # 2bit 
     output_analog = np.zeros(n_cell)
-    output_digital = np.zeros((n_cell, 9))
+    output_digital = np.zeros((n_cell, adc_bit))
+#    out_len = 
     output_register = np.zeros(38)
     temp = np.zeros(38)
     #print(input_bits, bit_sliced_weights) 
@@ -204,7 +209,7 @@ def mvm_simple(input_bits, bit_sliced_weights):
         temp[:23] = adc_shift_n_add(output_digital, nbits)            
         
         # shift
-        output_register[1:38] = output_register[0:37]
+        output_register[1:] = output_register[:-1]
         
         # add
         if i < input_bits.shape[1]-1:
@@ -213,6 +218,8 @@ def mvm_simple(input_bits, bit_sliced_weights):
             output_register = binary_subtract(output_register, temp)
 
     out = bits16_to_float(output_register[10:26])
+    # --> Is this needed?
+
     return out
 
 """
