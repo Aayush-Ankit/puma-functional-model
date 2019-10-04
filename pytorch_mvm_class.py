@@ -20,6 +20,7 @@ class Conv2d_mvm_function(Function):
     def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1):
         #output = F.conv2d(input, weight,  bias, stride, padding, dilation, groups)
         
+        print(padding)
         """"""
         weight_channels_out = weight.shape[0]
         weight_channels_in = weight.shape[1]
@@ -30,9 +31,12 @@ class Conv2d_mvm_function(Function):
         flatten_weight = weight.reshape((weight_channels_out, length))  ## flatten weights
         flatten_bit_slice_weight = bit_slice_weight(flatten_weight, 2)  ## flatten weights --> 16bit fixed point --> bit slice
 
-        input_channels = input.shape[0]     # weight_channels_in == input_channels
-        input_row = input.shape[1]
-        input_col = input.shape[2]
+        input_batch = input.shape[0]
+        input_channels = input.shape[1]     # weight_channels_in == input_channels
+        input_row = input.shape[2] + padding[0]*2
+        input_col = input.shape[3] + padding[1]*2
+        input_pad = np.zeros((input_batch, input_channels, input_row, input_col))
+        input_pad[:,:,1:-1,1:-1] = input
         
         output_row = input_row - weight_row + 1
         output_col = input_col - weight_col + 1 
@@ -40,7 +44,7 @@ class Conv2d_mvm_function(Function):
 
         for i in range(output_row):
             for j in range(output_col):
-                flatten_input = input[:,:, i:i+weight_row, j:j+weight_col].flatten()    ## one set of inputs --> flatten
+                flatten_input = input_pad[:,:, i:i+weight_row, j:j+weight_col].flatten()    ## one set of inputs --> flatten
                 flatten_binary_input= np.zeros((flatten_input.shape[0], 16))            ## flatten inputs --> 16bit fixed point
                 for l in range(flatten_input.shape[0]):
                     flatten_binary_input[l] = float_to_16bits(flatten_input[l])
@@ -48,7 +52,11 @@ class Conv2d_mvm_function(Function):
                 ## mvm_simple : one input line dot one weight line
                 for k in range(weight_channels_out):
                     output[k,i,j] = mvm_simple(flatten_binary_input,flatten_bit_slice_weight[:,k*8:k*8+8])
-                    
+
+        ## Need to do: 
+        ## 1. Bias
+        ## 2. Separate inputs/weights with  Crossbar size
+
         """"""
         ctx.save_for_backward(input, weight, bias)
         ctx.stride = stride
@@ -163,13 +171,11 @@ class Conv2d_mvm(_ConvNd_mvm):
         super(Conv2d_mvm, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
             False, _pair(0), groups, bias, padding_mode)
-
     #@weak_script_method
     def forward(self, input):
         if self.padding_mode == 'circular':
             expanded_padding = ((self.padding[1] + 1) // 2, self.padding[1] // 2,
                                 (self.padding[0] + 1) // 2, self.padding[0] // 2)
-
             return Conv2d_mvm_function.apply(F.pad(input, expanded_padding, mode='circular'),
                             self.weight, self.bias, self.stride,
                             _pair(0), self.dilation, self.groups)

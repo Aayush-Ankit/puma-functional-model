@@ -12,9 +12,10 @@ import torch.nn as nn
 
 # float --> 16bit fixed point
 def float_to_16bits(number):
-    if number >= 16 or number < -16:
-        print("fixed-point 16bit number should be in -16 <= x < 16")
+    if number >= 8 or number < -8:
+        print("fixed-point 16bit number should be in -8 <= x < 8")
         return 0
+
     bin16 = np.zeros(16)
     negative = False
     if number < 0:
@@ -22,7 +23,7 @@ def float_to_16bits(number):
     number = abs(number)
 
     i = 15
-    number *= 2<<11 #7
+    number *= 2<<11 
     while number > 0:
         if number%2 > 0:
             bin16[i] = 1
@@ -45,6 +46,8 @@ def bits16_to_float(bits):
     
     if bits.shape[0] != 16:
         print("It should be 16 bits")
+        return 0
+
     negative = False
     if bits[0] == 1:
         negative = True
@@ -80,12 +83,11 @@ def bits_to_uint(bits):
         
     return number  
 
-def uint_to_bits(number): # adc produce 9-bits
+def uint_to_bits(number, nbits=9): # adc produce 9-bits
     
-    nbit = 9
-    bits = np.zeros(nbit)
-    for i in range(nbit):
-        bits[nbit-1-i] = number%2
+    bits = np.zeros(nbits)
+    for i in range(nbits):
+        bits[nbits-1-i] = number%2
         number //= 2
     return bits
 
@@ -140,8 +142,9 @@ def binary_subtract(a,b):  #a-b
         i-=1  
     return output  
 
-
-def bit_slice_weight(weights, nbit): # weights --> 16-bit fixed-point --> nbit, nbit%2 => 0
+# Set Bit sliced weights as integer arrays 
+# Because the current of each bitline of crossbar is analog value
+def bit_slice_weight(weights, nbit): # weights --> 16-bit fixed-point --> nbit (nbit%2 => 0)
   weights = torch.transpose((weights),1,0)
   rows = weights.shape[0]
   cols = weights.shape[1]
@@ -157,7 +160,7 @@ def bit_slice_weight(weights, nbit): # weights --> 16-bit fixed-point --> nbit, 
   return bit_sliced_weights
 
 
-def adc_shift_n_add(adc_out, nbits): # shift and add 8 x 9bit after adc (unsigned)
+def adc_shift_n_add(adc_out, nbits=2): # shift and add 8 x 9bit after adc (unsigned)
     n_cells = adc_out.shape[0]
     adc_bits = adc_out.shape[1]
     
