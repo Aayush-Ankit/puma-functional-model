@@ -33,7 +33,7 @@ class Conv2d_mvm_function(Function):
         input_row = input.shape[2] + padding[0]*2
         input_col = input.shape[3] + padding[1]*2
         input_pad = np.zeros((input_batch, input_channels, input_row, input_col))
-        input_pad[:,:,padding[0]:input_row-padding[0],padding[1]:input_col--padding[1]] = input
+        input_pad[:,:,padding[0]:input_row-padding[0],padding[1]:input_col-padding[1]] = input
         
         output_row = input_row - weight_row + 1
         output_col = input_col - weight_col + 1 

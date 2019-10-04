@@ -21,7 +21,7 @@ def float_to_16bits(number):
     if number < 0:
         negative = True
     number = abs(number)
-
+ 
     i = 15
     number *= 2<<11 
     while number > 0:
