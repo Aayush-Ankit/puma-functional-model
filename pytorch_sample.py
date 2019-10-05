@@ -12,7 +12,7 @@ labels = torch.tensor([1])
 weights = torch.tensor([[[[2.,1],[1,2]],[[4,2],[0,1]],[[1,0],[3,2]]],[[[2.,1],[1,2]],[[3,2],[1,1]],[[1,2],[3,2]]]])/10
 trainloader = [[inputs, labels]]
 #trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
-#trainloader2 = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
+#trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
 
 class Net(nn.Module):
     def __init__(self):
