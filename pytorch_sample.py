@@ -7,9 +7,9 @@ import torch.optim as optim
 
 from pytorch_mvm_class import *
 
-inputs = torch.tensor([[[[1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]]])
+inputs = torch.tensor([[[[1.,0,1],[-2,1,0],[1,2,1]],[[2,3,1],[-2,0,1],[-4,2,1]],[[3,2,1],[0,2,1],[-5,3,2]]]])
 labels = torch.tensor([1])
-weights = torch.tensor([[[[2.,1],[1,2]],[[4,2],[0,1]],[[1,0],[3,2]]],[[[2.,1],[1,2]],[[3,2],[1,1]],[[1,2],[3,2]]]])/10
+weights = torch.tensor([[[[-2.,1],[1,-2]],[[4,2],[0,1]],[[1,0],[3,2]]],[[[2.,1],[1,2]],[[3,2],[1,1]],[[1,-2],[-3,2]]]])/10
 trainloader = [[inputs, labels]]
 #trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
 #trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
@@ -25,7 +25,7 @@ class Net(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-#        print(x)
+        print(x)
         x = x.view(-1, 8)
         x = self.fc1(x)
         return x
@@ -49,4 +49,4 @@ for itr in range(1):
         loss.backward()
     
         optimizer.step()
-        print(outputs)
+#        print(outputs)

@@ -13,8 +13,7 @@ import torch.nn as nn
 # float --> 16bit fixed point. ex) [1, 0, 1, 0, 0, ..., 0, 1]
 def float_to_16bits(number):
     if number >= 8 or number < -8:
-        print("fixed-point 16bit number should be in -8 <= x < 8")
-        return 0
+        raise ValueError("fixed-point 16bit number should be in -8 <= x < 8")
 
     bin16 = np.zeros(16)
     negative = False
@@ -45,8 +44,7 @@ def float_to_16bits(number):
 def bits16_to_float(bits):
     
     if bits.shape[0] != 16:
-        print("It should be 16 bits")
-        return 0
+        raise ValueError("It should be 16 bits")
 
     negative = False
     if bits[0] == 1:
@@ -121,8 +119,7 @@ def binary_subtract(a,b):  #a-b
   
     length = a.shape[0]
     if length != b.shape[0]:
-        print("Error: Length should be equal")
-        return 0
+        raise ValueError("Error: Length should be equal")
     output = np.zeros(length)
     i = length-1
     
@@ -146,19 +143,19 @@ def binary_subtract(a,b):  #a-b
 # Return Bit sliced weights as integer arrays 
 # Because the current of each bitline of crossbar is analog value
 def bit_slice_weight(weights, nbit): # weights --> 16-bit fixed-point --> nbit (nbit%2 => 0)
-  weights = torch.transpose((weights),1,0)
-  rows = weights.shape[0]
-  cols = weights.shape[1]
-  cells_per_weight = int(16/nbit)
+    weights = torch.transpose((weights),1,0)
+    rows = weights.shape[0]
+    cols = weights.shape[1]
+    cells_per_weight = int(16/nbit)
   
-  bit_sliced_weights = np.zeros((rows, cols*cells_per_weight))
-  for i in range(rows):
-    for j in range(cols):
-      fix16b_weight = float_to_16bits(weights[i,j])
-      for n in range(cells_per_weight):
-        bit_sliced_weights[i, j*cells_per_weight +n] = bits_to_uint(fix16b_weight[2*n:2*n+2])
+    bit_sliced_weights = np.zeros((rows, cols*cells_per_weight))
+    for i in range(rows):
+        for j in range(cols):
+            fix16b_weight = float_to_16bits(weights[i,j])
+            for n in range(cells_per_weight):
+                bit_sliced_weights[i, j*cells_per_weight +n] = bits_to_uint(fix16b_weight[2*n:2*n+2])
   
-  return bit_sliced_weights
+    return bit_sliced_weights
 
 
 # Return output for 1 bit input.
@@ -195,10 +192,8 @@ def mvm_simple(input_bits, bit_sliced_weights):
     nbits = int(16/n_cell) # 2bit 
     output_analog = np.zeros(n_cell)
     output_digital = np.zeros((n_cell, adc_bit))
-#    out_len = 
     output_register = np.zeros(38)
     temp = np.zeros(38)
-    #print(input_bits, bit_sliced_weights) 
     for i in range(input_bits.shape[1]):    #16):
         #print(i)
         for w_i in range(n_cell):      #8):
@@ -218,9 +213,32 @@ def mvm_simple(input_bits, bit_sliced_weights):
             output_register = binary_subtract(output_register, temp)
 
     out = bits16_to_float(output_register[10:26])
-    # --> Is this needed?
 
     return out
+
+class xbar: t 
+
+    def __init__(self, weight): # get bitsliced weight and store it. 
+
+        if weight.shape[0]>128 or weight.shape[1]>128:
+            raise ValueError("One Crossbar shape should be < (128,128)")
+        
+        self.weight = np.zeros((128,128))
+        self.weight[:weight.shape[0], :weight.shape[1]] = weight
+
+    def mvm(self, input): # get input (16-bit) and mvm 
+
+        if input.shape[0]>128:
+            raise ValueError("input size should be < 128")
+        
+        output=torch.zeros(16) # 128/8cells = 16 weights
+        for i in range(16):
+            output[i] = mvm_simple(input, self.weight[:,i*8:i*8+8])
+        
+        return output
+
+
+
 
 """
 adcout = np.zeros((8,9))
