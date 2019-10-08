@@ -33,8 +33,8 @@ class Net(nn.Module):
 
 net = Net()
 
-#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-#net.to(device)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+net.to(device)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)

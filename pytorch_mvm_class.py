@@ -28,7 +28,8 @@ class Conv2d_mvm_function(Function):
         flatten_weight = weight.reshape((weight_channels_out, length))  ## flatten weights
         flatten_bit_slice_weight = bit_slice_weight(flatten_weight, 2)  ## flatten weights --> 16bit fixed point --> bit slice
 
-        # put bitsliced weight into 128x128 xbars.
+        # bitsliced weight into 128x128 xbars 
+        # xbar_row separates inputs --> results in a same column with different rows will be added later
         xbar_row = math.ceil(flatten_bit_slice_weight.shape[0]/128)
         xbar_col = math.ceil(flatten_bit_slice_weight.shape[1]/128)
         xbars = np.zeros((xbar_row,xbar_col), dtype=xbar)
@@ -44,47 +45,38 @@ class Conv2d_mvm_function(Function):
                     end_col = (j+1)*128
                 xbars[i,j] = xbar(flatten_bit_slice_weight[i*128:end_row, j*128:end_col])
         xbars_out = torch.zeros(math.ceil(weight_channels_out/16)*16)
+        print(xbars.shape)
 
         input_batch = input.shape[0]
         input_channels = input.shape[1]     # weight_channels_in == input_channels
         input_row = input.shape[2] + padding[0]*2
         input_col = input.shape[3] + padding[1]*2
-        input_pad = np.zeros((input_batch, input_channels, input_row, input_col))
+        input_pad = torch.zeros((input_batch, input_channels, input_row, input_col))
         input_pad[:,:,padding[0]:input_row-padding[0],padding[1]:input_col-padding[1]] = input
         
         output_row = input_row - weight_row + 1
         output_col = input_col - weight_col + 1 
         output = torch.zeros((weight_channels_out, output_row, output_col))
-        """
-        for i in range(output_row):
-            for j in range(output_col):
-                flatten_input = input_pad[:,:, i:i+weight_row, j:j+weight_col].flatten()    ## one set of inputs --> flatten
-                flatten_binary_input= np.zeros((flatten_input.shape[0], 16))            ## flatten inputs --> 16bit fixed point
-                for l in range(flatten_input.shape[0]):
-                    flatten_binary_input[l] = float_to_16bits(flatten_input[l])
 
-                ## mvm_simple : one input line dot one weight line
-                for k in range(weight_channels_out):
-                    output[k,i,j] = mvm_simple(flatten_binary_input,flatten_bit_slice_weight[:,k*8:k*8+8])
-        """
 
         for i in range(output_row):
             for j in range(output_col):
                 flatten_input = input_pad[:,:, i:i+weight_row, j:j+weight_col].flatten()    ## one set of inputs --> flatten
-
+                print(i,j)
                 for x_i in range(xbar_row):
                     if (x_i+1)*128 > input_pad.shape[0]:
                         end_row = input_pad.shape[0]
                     else:
                         end_row = (x_i+1)*128
-                    flatten_binary_input = np.zeros((128,16))
+
+                    # input has 128 rows regardless of its original size cuz crossbar: 128 x 128
+                    flatten_binary_input = torch.zeros((128,16))
                     for l in range(128):
                         if x_i*128+l>=flatten_input.shape[0]:
                             break
                         flatten_binary_input[l] = float_to_16bits(flatten_input[x_i*128+l])
 
                     for x_j in range(xbar_col):
-                        print(flatten_binary_input)
                         xbars_out[x_j*16:(x_j+1)*16] += xbars[x_i,x_j].mvm(flatten_binary_input)
                 output[:,i,j] = xbars_out[:weight_channels_out]
                 xbars_out.fill_(0)
@@ -125,7 +117,7 @@ class Conv2d_mvm_function(Function):
         if bias is not None and ctx.needs_input_grad[2]:
             grad_bias = grad_output.sum((0,2,3)).squeeze(0)
             
-        #print(grad_weight)
+        print(grad_weight)
         return grad_input, grad_weight, grad_bias, None, None, None, None
 
 

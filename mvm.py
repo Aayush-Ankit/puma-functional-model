@@ -15,7 +15,7 @@ def float_to_16bits(number):
     if number >= 8 or number < -8:
         raise ValueError("fixed-point 16bit number should be in -8 <= x < 8")
 
-    bin16 = np.zeros(16)
+    bin16 = torch.zeros(16)
     negative = False
     if number < 0:
         negative = True
@@ -84,7 +84,7 @@ def bits_to_uint(bits):
 # Function of ADC
 def uint_to_bits(number, nbits=9): # adc produce 9-bits
     
-    bits = np.zeros(nbits)
+    bits = torch.zeros(nbits)
     for i in range(nbits):
         bits[nbits-1-i] = number%2
         number //= 2
@@ -96,7 +96,7 @@ def binary_add(a,b):  # a and b should be array of 0,1
     len_a = a.shape[0]
     len_b = b.shape[0]
     length = max(len_a,len_b)
-    output = np.zeros(length)
+    output = torch.zeros(length)
 
     c = 0
     for i in range(min(len_a,len_b)):
@@ -120,7 +120,7 @@ def binary_subtract(a,b):  #a-b
     length = a.shape[0]
     if length != b.shape[0]:
         raise ValueError("Error: Length should be equal")
-    output = np.zeros(length)
+    output = torch.zeros(length)
     i = length-1
     
     c = 0
@@ -148,7 +148,7 @@ def bit_slice_weight(weights, nbit): # weights --> 16-bit fixed-point --> nbit (
     cols = weights.shape[1]
     cells_per_weight = int(16/nbit)
   
-    bit_sliced_weights = np.zeros((rows, cols*cells_per_weight))
+    bit_sliced_weights = torch.zeros((rows, cols*cells_per_weight))
     for i in range(rows):
         for j in range(cols):
             fix16b_weight = float_to_16bits(weights[i,j])
@@ -165,8 +165,8 @@ def adc_shift_n_add(adc_out, nbits=2): # shift and add 8 x 9bit after adc (unsig
     adc_bits = adc_out.shape[1]
     
     output_bit_len = int(adc_bits + nbits*(n_cells-1)) #23
-    output = np.zeros(output_bit_len)
-    output2 = np.zeros(output_bit_len)
+    output = torch.zeros(output_bit_len)
+    output2 = torch.zeros(output_bit_len)
 
     output[:adc_bits] = adc_out[n_cells-1]
     for i in range(1,n_cells):
@@ -186,18 +186,17 @@ def adc_shift_n_add(adc_out, nbits=2): # shift and add 8 x 9bit after adc (unsig
 # 1 weight set: Bitsliced float array [n x (16/nbit)] 
 # --> output: 1 float number
 def mvm_simple(input_bits, bit_sliced_weights):  
-    
     adc_bit = 9
     n_cell = bit_sliced_weights.shape[1]  # 8
     nbits = int(16/n_cell) # 2bit 
-    output_analog = np.zeros(n_cell)
-    output_digital = np.zeros((n_cell, adc_bit))
-    output_register = np.zeros(38)
-    temp = np.zeros(38)
+    output_analog = torch.zeros(n_cell)
+    output_digital = torch.zeros((n_cell, adc_bit))
+    output_register = torch.zeros(38)
+    temp = torch.zeros(38)
     for i in range(input_bits.shape[1]):    #16):
         #print(i)
         for w_i in range(n_cell):      #8):
-            output_analog[w_i] = np.sum(input_bits[:,15-i]*bit_sliced_weights[:,w_i])
+            output_analog[w_i] = torch.sum(input_bits[:,15-i]*bit_sliced_weights[:,w_i])
             
             # ADC
             output_digital[w_i] = uint_to_bits(output_analog[w_i])
@@ -216,14 +215,14 @@ def mvm_simple(input_bits, bit_sliced_weights):
 
     return out
 
-class xbar: t 
+class xbar:  
 
     def __init__(self, weight): # get bitsliced weight and store it. 
 
         if weight.shape[0]>128 or weight.shape[1]>128:
             raise ValueError("One Crossbar shape should be < (128,128)")
         
-        self.weight = np.zeros((128,128))
+        self.weight = torch.zeros((128,128))
         self.weight[:weight.shape[0], :weight.shape[1]] = weight
 
     def mvm(self, input): # get input (16-bit) and mvm 
