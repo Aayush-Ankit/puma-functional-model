@@ -47,7 +47,7 @@ class Net(nn.Module):
 net = Net()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-net.to(device)
+#net.to(device)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
@@ -59,7 +59,7 @@ for itr in range(10):
         if i%1 == 0:
             print(i)
         inputs, labels = data
-        inputs, labels = inputs.to(device), labels.to(device)    
+#        inputs, labels = inputs.to(device), labels.to(device)    
         outputs = net(inputs)
         forward = time.time()
         print(forward-begin)
