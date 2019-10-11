@@ -166,19 +166,20 @@ def adc_shift_n_add(adc_out, nbits=2): # shift and add 8 x 9bit after adc (unsig
     
     output_bit_len = int(adc_bits + nbits*(n_cells-1)) #23
     output = torch.zeros(output_bit_len)
+    output1 = torch.zeros(output_bit_len)
     output2 = torch.zeros(output_bit_len)
 
     output[:adc_bits] = adc_out[n_cells-1]
     for i in range(1,n_cells):
         
         # shift right nbits
-        output[nbits:output_bit_len] = output[:output_bit_len-nbits]
-        for j in range(nbits):
-            output[j] = 0
+        output1[nbits:output_bit_len] = output[:output_bit_len-nbits]
+#        for j in range(nbits):
+#            output[j] = 0
         
         # add
         output2[:adc_bits] = adc_out[n_cells-1-i]
-        output = binary_add(output, output2)
+        output = binary_add(output1, output2)
     return output
 
 
