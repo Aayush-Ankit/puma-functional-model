@@ -88,6 +88,7 @@ def uint_to_bits(number, nbits=9): # adc produce 9-bits
     for i in range(nbits):
         bits[nbits-1-i] = number%2
         number //= 2
+#    print(bits)
     return bits
 
 
@@ -100,23 +101,28 @@ def binary_add(a,b):  # a and b should be array of 0,1
 
     c = 0
     for i in range(min(len_a,len_b)):
-        if a[len_a-i-1]+b[len_b-i-1]+c ==3:
+        out = a[len_a-i-1]+b[len_b-i-1]+c
+        if out ==3:
             output[length-i-1] = 1
             c = 1
-        elif a[len_a-i-1]+b[len_b-i-1]+c == 2:
+        elif out == 2:
             output[length-i-1] = 0
             c = 1
-        elif a[len_a-i-1]+b[len_b-i-1]+c == 1:
+        elif out == 1:
             output[length-i-1] = 1
             c = 0
         else:
             output[length-i-1] = 0
             c = 0
     #output[0] += c
+#    print(a)
+#    print(b)
+#    print(output)
+#    print("--------")
     return output
   
 def binary_subtract(a,b):  #a-b
-  
+#    print("subtract!!") 
     length = a.shape[0]
     if length != b.shape[0]:
         raise ValueError("Error: Length should be equal")
@@ -173,10 +179,9 @@ def adc_shift_n_add(adc_out, nbits=2): # shift and add 8 x 9bit after adc (unsig
     for i in range(1,n_cells):
         
         # shift right nbits
+        output1 = output1.fill_(0)
         output1[nbits:output_bit_len] = output[:output_bit_len-nbits]
-#        for j in range(nbits):
-#            output[j] = 0
-        
+#        
         # add
         output2[:adc_bits] = adc_out[n_cells-1-i]
         output = binary_add(output1, output2)
@@ -193,25 +198,27 @@ def mvm_simple(input_bits, bit_sliced_weights):
     output_analog = torch.zeros(n_cell)
     output_digital = torch.zeros((n_cell, adc_bit))
     output_register = torch.zeros(38)
+    output_shift = torch.zeros(38)
     temp = torch.zeros(38)
     for i in range(input_bits.shape[1]):    #16):
-        #print(i)
         for w_i in range(n_cell):      #8):
             output_analog[w_i] = torch.sum(input_bits[:,15-i]*bit_sliced_weights[:,w_i])
             
             # ADC
             output_digital[w_i] = uint_to_bits(output_analog[w_i])
         temp[:23] = adc_shift_n_add(output_digital, nbits)            
-        
         # shift
-        output_register[1:] = output_register[:-1]
+        output_shift = output_shift.fill_(0)#torch.clone(output_register)
+        output_shift[1:38] = output_register[0:37]
+        
         
         # add
         if i < input_bits.shape[1]-1:
-            output_register = binary_add(output_register, temp)
-        else: # subtract (the last input bit)    
-            output_register = binary_subtract(output_register, temp)
-
+            output_register = binary_add(output_shift, temp)
+        #else: # subtract (the last input bit)    
+        elif i == input_bits.shape[1]-1:
+            output_register = binary_subtract(output_shift, temp)
+#    print(output_register)
     out = bits16_to_float(output_register[10:26])
 
     return out

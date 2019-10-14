@@ -64,21 +64,21 @@ class Conv2d_mvm_function(Function):
                 flatten_input = input_pad[:,:, i:i+weight_row, j:j+weight_col].flatten()    ## one set of inputs --> flatten
                 print(i,j)
                 for x_i in range(xbar_row):
-                    if (x_i+1)*128 > input_pad.shape[0]:
-                        end_row = input_pad.shape[0]
+                    if (x_i+1)*128 > flatten_input.shape[0]:
+                        end_row = flatten_input.shape[0]
                     else:
                         end_row = (x_i+1)*128
-
+                    print(end_row)
                     # input has 128 rows regardless of its original size cuz crossbar: 128 x 128
                     flatten_binary_input = torch.zeros((128,16))
                     for l in range(128):
-                        if x_i*128+l>=flatten_input.shape[0]:
+                        if x_i*128+l>=end_row:#flatten_input.shape[0]:
                             break
                         flatten_binary_input[l] = float_to_16bits(flatten_input[x_i*128+l])
 
                     for x_j in range(xbar_col):
-                        xbars_out[x_j*16:(x_j+1)*16] += xbars[x_i,x_j].mvm(flatten_binary_input)
-                output[:,i,j] = xbars_out[:weight_channels_out]
+                        xbars_out[x_j*16:(x_j+1)*16] = xbars[x_i,x_j].mvm(flatten_binary_input)
+                output[:,i,j] += xbars_out[:weight_channels_out]
                 xbars_out.fill_(0)
 
 
