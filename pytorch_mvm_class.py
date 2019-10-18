@@ -26,7 +26,9 @@ class Conv2d_mvm_function(Function):
 
         length = weight_channels_in * weight_row * weight_col
         flatten_weight = weight.reshape((weight_channels_out, length))  ## flatten weights
-        flatten_bit_slice_weight = bit_slice_weight(flatten_weight, 2)  ## flatten weights --> 16bit fixed point --> bit slice
+
+        flatten_bit_slice_weight = bit_slice(flatten_weight)  ## flatten weights
+#        flatten_bit_slice_weight = bit_slice_weight(flatten_weight, 2)  ## flatten weights --> 16bit fixed point --> bit slice
 
         # bitsliced weight into 128x128 xbars 
         # xbar_row separates inputs --> results in a same column with different rows will be added later

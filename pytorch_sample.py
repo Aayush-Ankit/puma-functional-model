@@ -17,8 +17,8 @@ trainloader = [[inputs, labels]]
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = Conv2d_mvm(3,2,2, bias=False)#, padding = 1)
-#        self.conv1 = nn.Conv2d(3,2,2, bias=False)
+#        self.conv1 = Conv2d_mvm(3,2,2, bias=False)#, padding = 1)
+        self.conv1 = nn.Conv2d(3,2,2, bias=False)
         self.conv1.weight.data = torch.clone(weights)
 #        self.conv1.weight.requires_grad = True
 
@@ -35,7 +35,7 @@ class Net(nn.Module):
 net = Net()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-net.to(device)
+#net.to(device)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)

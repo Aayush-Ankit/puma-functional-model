@@ -2,6 +2,31 @@ import numpy as np
 import torch
 import torch.nn as nn
  
+def get_tree_index(idx):
+
+    n = idx.shape[1]
+    idx = idx.mul(2)
+    idx = torch.cat((idx, idx.add(1)))
+    idx =idx.reshape((1, n*2))  
+  
+    return idx
+
+idx2 = torch.tensor([range(2)])     # [0, 1]
+idx4 = get_tree_index(idx2)         # [0, 2, 1, 3]
+idx8 = get_tree_index(idx4)         # [0, 4, 2, 6, 1, 5, 3, 7]
+idx16 = get_tree_index(idx8)        # [0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15]
+
+def get_weight_index(idx, out_ch):
+  
+    n =idx.shape[1]
+    idx_new = idx.expand(out_ch, n)
+    cols = torch.tensor([range(out_ch)])
+    cols = torch.tensor([range(out_ch)]).mul(n).transpose(1,0).expand(out_ch,n)
+    idx_new = idx.add(cols)
+    idx_new = idx_new.transpose(1,0).reshape(1, -1)  
+  
+    return idx_new
+
 
 ## 16 bit fixed point
 ##   +---+--------------------+------------------------+
@@ -9,6 +34,45 @@ import torch.nn as nn
 ##   +---+--------------------+------------------------+
 ##   sign  integer              fraction
 ##
+
+
+# fix bit_slicing to 2 bit --> later make it variable
+def bit_slice(weight):
+
+    #assume positive
+    # weight.shape[0] = output channels
+    # weight.shape[1] = flattened weight length
+
+    out_channel = weight.shape[0]
+
+    weight = torch.mul(weight, 16)
+
+    weight_int = torch.floor(weight)
+    weight_frac = torch.mul(torch.frac(weight),2**8)
+    weight = torch.cat([weight_int, weight_frac])
+    # ------ 8-bit slice
+
+    weight = torch.div(weight,2**4)
+    weight_int = torch.floor(weight)
+    weight_frac = torch.mul(torch.frac(weight),2**4)
+    weight = torch.cat([weight_int, weight_frac])
+    # ------ 4-bit slice
+
+    weight = torch.div(weight,2**2)
+    weight_int = torch.floor(weight)
+    weight_frac = torch.mul(torch.frac(weight),2**2)
+    weight = torch.cat([weight_int, weight_frac])
+    weight[-out_channel:]= torch.floor(weight[-out_channel:])   # last layer
+    # ------ 2-bit slice
+
+    # already made 2-bit. -> stop.
+    # If I use 2^n bit-slice, I don't have to slice more to make 1-bits and then combine it. 
+
+    weight_idx = get_weight_index(idx8, out_channel)
+    print(weight_idx)
+    bit_slice = weight[weight_idx[0],:].t()   
+
+    return bit_slice
 
 # float --> 16bit fixed point. ex) [1, 0, 1, 0, 0, ..., 0, 1]
 def float_to_16bits(number):
