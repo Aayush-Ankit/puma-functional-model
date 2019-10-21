@@ -27,8 +27,9 @@ class Conv2d_mvm_function(Function):
         length = weight_channels_in * weight_row * weight_col
         flatten_weight = weight.reshape((weight_channels_out, length))  ## flatten weights
 
-        flatten_bit_slice_weight = bit_slice(flatten_weight)  ## flatten weights
-#        flatten_bit_slice_weight = bit_slice_weight(flatten_weight, 2)  ## flatten weights --> 16bit fixed point --> bit slice
+#        flatten_bit_slice_weight = bit_slice(flatten_weight)  ## flatten weights
+        flatten_bit_slice_weight = bit_slice_weight(flatten_weight, 2)  ## flatten weights --> 16bit fixed point --> bit slice
+#        print(flatten_bit_slice_weight)
 
         # bitsliced weight into 128x128 xbars 
         # xbar_row separates inputs --> results in a same column with different rows will be added later
@@ -47,7 +48,7 @@ class Conv2d_mvm_function(Function):
                     end_col = (j+1)*128
                 xbars[i,j] = xbar(flatten_bit_slice_weight[i*128:end_row, j*128:end_col])
         xbars_out = torch.zeros(math.ceil(weight_channels_out/16)*16)
-        print(xbars.shape)
+#        print(xbars.shape)
 
         input_batch = input.shape[0]
         input_channels = input.shape[1]     # weight_channels_in == input_channels
@@ -64,13 +65,13 @@ class Conv2d_mvm_function(Function):
         for i in range(output_row):
             for j in range(output_col):
                 flatten_input = input_pad[:,:, i:i+weight_row, j:j+weight_col].flatten()    ## one set of inputs --> flatten
-                print(i,j)
+ #               print(i,j)
                 for x_i in range(xbar_row):
                     if (x_i+1)*128 > flatten_input.shape[0]:
                         end_row = flatten_input.shape[0]
                     else:
                         end_row = (x_i+1)*128
-                    print(end_row)
+                    #print(end_row)
                     # input has 128 rows regardless of its original size cuz crossbar: 128 x 128
                     flatten_binary_input = torch.zeros((128,16))
                     for l in range(128):

@@ -71,7 +71,7 @@ def bit_slice(weight):
     weight_idx = get_weight_index(idx8, out_channel)
     print(weight_idx)
     bit_slice = weight[weight_idx[0],:].t()   
-
+    print(bit_slice)
     return bit_slice
 
 # float --> 16bit fixed point. ex) [1, 0, 1, 0, 0, ..., 0, 1]

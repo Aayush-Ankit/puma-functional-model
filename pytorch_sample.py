@@ -9,7 +9,7 @@ from pytorch_mvm_class import *
 
 inputs = torch.tensor([[[[1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]]])
 labels = torch.tensor([1])
-weights = torch.tensor([[[[2.,1],[1,2]],[[4,2],[0,1]],[[1,0],[3,2]]],[[[2.,1],[1,2]],[[3,2],[1,1]],[[1,2],[3,2]]]])/10
+weights = torch.tensor([[[[-2.,1],[1,2]],[[-4,2],[0,1]],[[1,0],[3,2]]],[[[2.,1],[1,2]],[[3,2],[1,1]],[[1,2],[3,2]]]])/10
 trainloader = [[inputs, labels]]
 #trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
 #trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
@@ -17,8 +17,8 @@ trainloader = [[inputs, labels]]
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-#        self.conv1 = Conv2d_mvm(3,2,2, bias=False)#, padding = 1)
-        self.conv1 = nn.Conv2d(3,2,2, bias=False)
+        self.conv1 = Conv2d_mvm(3,2,2, bias=False)#, padding = 1)   # --> my custom module for mvm
+#        self.conv1 = nn.Conv2d(3,2,2, bias=False)
         self.conv1.weight.data = torch.clone(weights)
 #        self.conv1.weight.requires_grad = True
 
@@ -26,7 +26,7 @@ class Net(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        print(x)
+        print(x)    # checking output of mvm operation. 
         x = x.view(-1, 8)
         x = self.fc1(x)
         return x
