@@ -9,6 +9,8 @@ import math
 import numpy as np
 from mvm import *
 
+import time
+
 # Custom conv2d formvm function: Doesn't work for back-propagation
 class Conv2d_mvm_function(Function):
 
@@ -27,8 +29,14 @@ class Conv2d_mvm_function(Function):
         length = weight_channels_in * weight_row * weight_col
         flatten_weight = weight.reshape((weight_channels_out, length))  ## flatten weights
 
-#        flatten_bit_slice_weight = bit_slice(flatten_weight)  ## flatten weights
-        flatten_bit_slice_weight = bit_slice_weight(flatten_weight, 2)  ## flatten weights --> 16bit fixed point --> bit slice
+#        begin = time.time()
+        flatten_bit_slice_weight = bit_slice(flatten_weight)  ## flatten weights
+#        inter = time.time()
+#        print("time spent in second version: ", inter-begin)
+#        print(flatten_bit_slice_weight)
+
+#        flatten_bit_slice_weight = bit_slice_weight(flatten_weight, 2)  ## flatten weights --> 16bit fixed point --> bit slice
+#        print("time spent in first version: ", time.time()-inter)
 #        print(flatten_bit_slice_weight)
 
         # bitsliced weight into 128x128 xbars 

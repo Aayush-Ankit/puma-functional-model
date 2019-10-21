@@ -44,7 +44,7 @@ for itr in range(1):
     for i, data in enumerate(trainloader):
         # get the inputs; data is a list of [inputs, labels]
         inputs, labels = data
-       #inputs, labels = inputs.to(device), labels.to(device)    
+#        inputs, labels = inputs.to(device), labels.to(device)    
         outputs = net(inputs)
 #        loss = criterion(outputs, labels)
 #        loss.backward()
