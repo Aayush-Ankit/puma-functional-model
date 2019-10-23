@@ -1,7 +1,11 @@
 import numpy as np
 import torch
 import torch.nn as nn
- 
+
+XBAR_COL_SIZE = 128
+XBAR_ROW_SIZE = 128
+
+
 def get_tree_index(idx):
 
     n = idx.shape[1]
@@ -318,19 +322,32 @@ def mvm_simple(input_bits, bit_sliced_weights):
 
     return out
 
+# get xbar (128x128), input (16-bit) and mvm
+def mvm(xbar, input):
+
+    if input.shape[0] > XBAR_ROW_SIZE:
+        raise ValueError("input size should be < 128")
+
+    output = torch.zeros(16)  # 128/8cells = 16 weights
+    for i in range(16):
+        output[i] = mvm_simple(input, xbar[:, i * 8:i * 8 + 8])
+
+    return output
+
+
 class xbar:  
 
     def __init__(self, weight): # get bitsliced weight and store it. 
 
-        if weight.shape[0]>128 or weight.shape[1]>128:
+        if weight.shape[0] > XBAR_ROW_SIZE or weight.shape[1] > XBAR_COL_SIZE:
             raise ValueError("One Crossbar shape should be < (128,128)")
         
-        self.weight = torch.zeros((128,128))
+        self.weight = torch.zeros((XBAR_ROW_SIZE, XBAR_COL_SIZE))
         self.weight[:weight.shape[0], :weight.shape[1]] = weight
 
     def mvm(self, input): # get input (16-bit) and mvm 
 
-        if input.shape[0]>128:
+        if input.shape[0]>XBAR_ROW_SIZE:
             raise ValueError("input size should be < 128")
         
         output=torch.zeros(16) # 128/8cells = 16 weights
