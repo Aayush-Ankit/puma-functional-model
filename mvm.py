@@ -2,11 +2,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+# this file will be replaced
+ 
 XBAR_COL_SIZE = 128
 XBAR_ROW_SIZE = 128
 
 
-def get_tree_index(idx):
+def get_tree_index(idx):    # version 2
 
     n = idx.shape[1]
     idx = idx.mul(2)
@@ -20,7 +22,7 @@ idx4 = get_tree_index(idx2)         # [0, 2, 1, 3]
 idx8 = get_tree_index(idx4)         # [0, 4, 2, 6, 1, 5, 3, 7]
 idx16 = get_tree_index(idx8)        # [0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15]
 
-def get_index_rearrange(idx, out_ch):
+def get_index_rearrange(idx, out_ch):   # version 2
   
     n =idx.shape[1]
     idx_new = idx.expand(out_ch, n)
@@ -34,29 +36,36 @@ def get_index_rearrange(idx, out_ch):
 
 ## 16 bit fixed point
 ##   +---+--------------------+------------------------+
-##   | 1 |    3    |                12                 |
+##   | 1 |  15-n   |                n                  |
 ##   +---+--------------------+------------------------+
 ##   sign  integer              fraction
 ##
 
-def slicing(weight, n_bit):
+def slicing(weight, n_bit): # version 2
   
     weight_int = torch.floor(weight)
-    weight_frac = weight.sub_(weight_int).mul_(2**n_bit)
+    weight_frac = weight.remainder_(1).mul_(2**n_bit)
     weight = torch.cat([weight_int, weight_frac])
     
     return weight
 
 # fix bit_slicing to 2 bit --> later make it variable
-def bit_slice(weight):
+def bit_slice(weight, frac_bit, device):  # version 2
 
     #assume positive
     # weight.shape[0] is output channels
     # weight.shape[1] is flattened weight length
 
+    int_bit = 15-frac_bit
+    # clipping
+    max_weight = torch.ones(weight.shape).mul_(2**int_bit-1/2**frac_bit).to(device)
+    min_weight = torch.ones(weight.shape).mul_(-2**int_bit).to(device)
+    weight = torch.where(weight < (2**int_bit-1/2**frac_bit), weight, max_weight)
+    weight = torch.where(weight > -2**int_bit, weight, min_weight)
+
     out_channel = weight.shape[0]
 
-    weight.mul_(16)  # 0000. 0000 0000 0000 --> 0000 0000. 0000 0000
+    weight.mul_(2**(frac_bit-8))  # 0000. 0000 0000 0000 --> 0000 0000. 0000 0000
     weight = slicing(weight,8)
     # ------ 8-bit slice
 
@@ -72,13 +81,92 @@ def bit_slice(weight):
     weight[-out_channel:]= torch.floor(weight[-out_channel:])   # last layer
 
     # already made 2-bit. -> stop.
-    # If I use 2^n bit-slice, I don't have to slice more to make 1-bits and then combine it. 
+    # If I use 2^n bit-slice, I d(on't have to slice more to make 1-bits and then combine it again. 
 
     weight_idx = get_index_rearrange(idx8, out_channel)
     bit_slice = weight[weight_idx[0],:].t()   
 
     return bit_slice
 
+def float_to_16bits_tensor(input, frac_bit, device): # input is batch x n tensor / output is n x 16 tensor.. version 2
+    #assume positive
+    # input.shape[0] = batch size
+    # input.shape[1] = flattened input length
+
+    int_bit = 15-frac_bit
+    # clipping
+    max_input = torch.ones(input.shape).mul_(2**int_bit-1/2**frac_bit).to(device)
+    min_input = torch.ones(input.shape).mul_(-2**int_bit).to(device)
+    input = torch.where(input < (2**int_bit-1/2**frac_bit), input, max_input)
+    input = torch.where(input > -2**int_bit, input, min_input)
+
+    batch_size = input.shape[0] 
+    input.mul_(2**(frac_bit-8))  # 0000. 0000 0000 0000 --> 0000 0000. 0000 0000
+    input = slicing(input,8)
+    # ------ 8-bit slice
+
+    input.div_(2**4)
+    input = slicing(input,4)
+    # ------ 4-bit slice
+
+    input.div_(2**2)
+    input = slicing(input,2)
+    # ------ 2-bit slice
+
+    input.div_(2)
+    input = slicing(input,1)    
+    # ------ 1-bit slice
+    
+    input[0].abs_() # for negative numbers.  
+    input[-1]= torch.floor(input[-1])   # last layer
+    
+    input_idx = get_index_rearrange(idx16, batch_size)
+    bit_slice = input[input_idx[0]].reshape(batch_size,16,-1).transpose(1,2)
+
+    return bit_slice
+
+
+
+def mvm_tensor(flatten_input, xbars, device):   # version 2
+
+    # xbars shape:          [xbars_row, xbars_col, XBAR_ROW_SIZE, XBAR_COL_SIZE]
+    # flatten_input shape:  [batch_size, xbars_row, 128, 16]
+    # 2-bit bit-slicing
+    xbars_row = xbars.shape[0]
+    xbars_col = xbars.shape[1]
+    batch_size = flatten_input.shape[0]
+
+    shift_add_1bit = torch.zeros(16) # input bits = 16
+    for i in range(16):
+        shift_add_1bit[i] = 2**i
+    shift_add_1bit[-1] *= -1        # last bit --> subtract
+    shift_add_1bit = shift_add_1bit.expand((batch_size, xbars_row, xbars_col, 16, int(XBAR_COL_SIZE/8))).transpose(3,4).to(device)
+    
+    shift_add_2bit = torch.zeros(8) # 16bit / 2bit-slice
+    for i in range(8):
+        shift_add_2bit[-i-1] = 4**i
+    shift_add_2bit = shift_add_2bit.expand((batch_size, xbars_row, xbars_col, int(XBAR_COL_SIZE/8), 8)).to(device)
+    
+    output_reg = torch.zeros(batch_size, xbars_row, xbars_col, 16, int(XBAR_COL_SIZE/8)).to(device)
+
+    for i in range(int(XBAR_COL_SIZE/8)):
+        input_1bit = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, 128, 1))
+        output_analog = torch.sum(torch.mul(xbars, input_1bit), 3).reshape(shift_add_2bit.shape)
+        output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_2bit), 4)
+    output = torch.sum(torch.mul(output_reg, shift_add_1bit), 3)
+    output.div_(2**12).trunc_().fmod_(2**16).div_(2**12)
+
+    # + sum xbar_rows
+    output = torch.sum(output, 1).reshape(batch_size, -1)
+    
+    return output
+
+
+
+##############################################################################################################################
+# Below is version 1
+#
+#
 # float --> 16bit fixed point. ex) [1, 0, 1, 0, 0, ..., 0, 1]
 def float_to_16bits(number):
     if number >= 8 or number < -8:
@@ -110,34 +198,6 @@ def float_to_16bits(number):
                 
     return bin16
 
-def float_to_16bits_tensor(input): # input is n tensor / output is n x 16 tensor
-    #assume positive
-    # input.shape[0] = 1
-    # input.shape[1] = flattened input length
-    
-    input = input.reshape((1,input.shape[0]))
-    input.mul_(16)  # 0000. 0000 0000 0000 --> 0000 0000. 0000 0000
-    input = slicing(input,8)
-    # ------ 8-bit slice
-
-    input.div_(2**4)
-    input = slicing(input,4)
-    # ------ 4-bit slice
-
-    input.div_(2**2)
-    input = slicing(input,2)
-    # ------ 2-bit slice
-
-    input.div_(2)
-    input = slicing(input,1)    
-    # ------ 1-bit slice
-    
-    input[0].abs_() # for negative numbers. 4 = 2**2. 
-    input[-1]= torch.floor(input[-1])   # last layer
-
-    bit_slice = input[idx16[0]].t()   
-    
-    return bit_slice
 
 
 def bits16_to_float(bits):
@@ -322,32 +382,23 @@ def mvm_simple(input_bits, bit_sliced_weights):
 
     return out
 
-# get xbar (128x128), input (16-bit) and mvm
-def mvm(xbar, input):
 
-    if input.shape[0] > XBAR_ROW_SIZE:
-        raise ValueError("input size should be < 128")
 
-    output = torch.zeros(16)  # 128/8cells = 16 weights
-    for i in range(16):
-        output[i] = mvm_simple(input, xbar[:, i * 8:i * 8 + 8])
-
-    return output
 
 
 class xbar:  
 
     def __init__(self, weight): # get bitsliced weight and store it. 
 
-        if weight.shape[0] > XBAR_ROW_SIZE or weight.shape[1] > XBAR_COL_SIZE:
+        if weight.shape[0]>128 or weight.shape[1]>128:
             raise ValueError("One Crossbar shape should be < (128,128)")
         
-        self.weight = torch.zeros((XBAR_ROW_SIZE, XBAR_COL_SIZE))
+        self.weight = torch.zeros((128,128))
         self.weight[:weight.shape[0], :weight.shape[1]] = weight
 
     def mvm(self, input): # get input (16-bit) and mvm 
 
-        if input.shape[0]>XBAR_ROW_SIZE:
+        if input.shape[0]>128:
             raise ValueError("input size should be < 128")
         
         output=torch.zeros(16) # 128/8cells = 16 weights
@@ -358,39 +409,4 @@ class xbar:
 
 
 
-
-"""
-adcout = np.zeros((8,9))
-adcout[7] = np.array([0,0,0,1,1,0,0,1,1])
-adcout[6] = np.array([1,0,1,0,1,0,0,1,1])
-adcout[5] = np.array([1,0,0,1,1,0,1,0,0])
-adcout[4] = np.array([0,0,1,0,1,1,0,0,0])
-
-a1 = bits_to_uint(adcout[7])
-a2 = bits_to_uint(adcout[6])
-a3 = bits_to_uint(adcout[5])
-a4 = bits_to_uint(adcout[4])
-
-print(a1, a2, a3, a4)
-print(a1+4*a2+16*a3+64*a4)
-sum = adc_shift_n_add(adcout,2)
-print(bits_to_uint(sum))
-
-#a=fix16(1.52)
-#b=fix16(-1.251)
-#w_a = fix16(2.252)
-#w_b = fix16(-1.51)
-bit_a = float16_to_bits(1.52)
-bit_b = float16_to_bits(-1.251)
-input = np.array([bit_a,bit_b])
-weight = np.array([[2.252], [1.25]])
-bit_weight=bit_slice_weight(weight,2)
-print(input)
-print(bit_weight)
-print(1.52*2.252-1.251*1.25)
-a=mvm_simple(input, bit_weight)
-print(bits_to_float16(a))
-
-
-"""
 

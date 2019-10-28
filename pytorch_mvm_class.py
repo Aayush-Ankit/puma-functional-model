@@ -20,76 +20,60 @@ class Conv2d_mvm_function(Function):
     # |            MVM           |   
     # +--------------------------+
     def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1):
+       
+        ## fixed-16: 
+        ## sign     : 1 
+        ## integer  : 3
+        ## fraction : 12
+        frac_bit = 12
+
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
         weight_channels_out = weight.shape[0]
         weight_channels_in = weight.shape[1]
         weight_row = weight.shape[2]
         weight_col = weight.shape[3]
-        print (weight.shape)
 
         length = weight_channels_in * weight_row * weight_col
         flatten_weight = weight.reshape((weight_channels_out, length))  ## flatten weights
 
-        #       begin = time.time()
-        flatten_bit_slice_weight = bit_slice(flatten_weight)  ## flatten weights
-        print(flatten_bit_slice_weight.shape)
-        inter = time.time()
-        #        print("time spent in second version: ", inter-begin)
-        #        flatten_bit_slice_weight = bit_slice_weight(flatten_weight, 2)  ## flatten weights --> 16bit fixed point --> bit slice
-        #        print("time spent in first version: ", time.time()-inter)
-        #        print(flatten_bit_slice_weight)
+        flatten_bit_slice_weight = bit_slice(flatten_weight, frac_bit, device) ## v2: flatten weights --> fixed point --> bit slice -- v1
 
-        # bitsliced weight into 128x128 xbars
+        # bitsliced weight into 128x128 xbars 
         # xbar_row separates inputs --> results in a same column with different rows will be added later
         xbar_row = math.ceil(flatten_bit_slice_weight.shape[0]/XBAR_ROW_SIZE)
         xbar_col = math.ceil(flatten_bit_slice_weight.shape[1]/XBAR_COL_SIZE)
 
-        # fill xbars data: placing weights into xbar
-        # xbars is the list o xbars
-        # TODO: do we want float here indeed OR another type?
-        xbars = torch.zeros ((XBAR_ROW_SIZE, XBAR_COL_SIZE, xbar_row, xbar_col), dtype=torch.float)
+        weight_xbar = torch.zeros((xbar_row*XBAR_ROW_SIZE, xbar_col*XBAR_COL_SIZE)).to(device)
+        weight_xbar[:flatten_bit_slice_weight.shape[0], :flatten_bit_slice_weight.shape[1]] = flatten_bit_slice_weight
+        xbars = torch.zeros((xbar_row, xbar_col, XBAR_ROW_SIZE, XBAR_COL_SIZE)).to(device)
+
         for i in range(xbar_row):
-            if (i + 1) * XBAR_ROW_SIZE > flatten_bit_slice_weight.shape[0]:
-                end_row = flatten_bit_slice_weight.shape[0]
-            else:
-                end_row = (i + 1) * XBAR_ROW_SIZE
             for j in range(xbar_col):
-                if (j + 1) * XBAR_COL_SIZE > flatten_bit_slice_weight.shape[1]:
-                    end_col = flatten_bit_slice_weight.shape[1]
-                else:
-                    end_col = (j + 1) * XBAR_COL_SIZE
-                xbars[0:end_row if end_row < XBAR_ROW_SIZE else XBAR_ROW_SIZE, 0:end_col if end_col < XBAR_COL_SIZE else XBAR_COL_SIZE, i, j] = flatten_bit_slice_weight[i*XBAR_ROW_SIZE:end_row, j*XBAR_COL_SIZE:end_col]
-        xbars_out = torch.zeros(math.ceil(weight_channels_out / 16) * 16)
+                xbars[i,j] = weight_xbar[i*XBAR_ROW_SIZE:(i+1)*XBAR_ROW_SIZE, j*XBAR_COL_SIZE:(j+1)*XBAR_COL_SIZE]
+        xbars_out = torch.zeros(math.ceil(weight_channels_out/16)*16) # output of xbars 
 
         input_batch = input.shape[0]
-        input_channels = input.shape[1]  # weight_channels_in == input_channels
+        input_channels = input.shape[1]     # weight_channels_in == input_channels
         input_row = input.shape[2] + padding[0]*2
         input_col = input.shape[3] + padding[1]*2
-        input_pad = torch.zeros((input_batch, input_channels, input_row, input_col))
+        input_pad = torch.zeros((input_batch, input_channels, input_row, input_col)).to(device)
         input_pad[:,:,padding[0]:input_row-padding[0],padding[1]:input_col-padding[1]] = input
         
         output_row = input_row - weight_row + 1
         output_col = input_col - weight_col + 1 
-        output = torch.zeros((weight_channels_out, output_row, output_col))
+        output = torch.zeros((input_batch, weight_channels_out, output_row, output_col)).to(device)
+        flatten_binary_input = torch.zeros(input_batch, xbars.shape[0]*XBAR_ROW_SIZE, 16).to(device)
 
         for i in range(output_row):
             for j in range(output_col):
-                flatten_input = input_pad[:,:, i:i+weight_row, j:j+weight_col].flatten() ## one set of inputs --> flatten
-                for x_i in range(xbar_row):
-                    if (x_i+1)*XBAR_ROW_SIZE > flatten_input.shape[0]:
-                        end_row = flatten_input.shape[0]
-                    else:
-                        end_row = (x_i+1)*XBAR_ROW_SIZE
-                    # input has XBAR_ROW_SIZE rows regardless of its original size cuz crossbar: XBAR_ROW_SIZE x XBAR_COL_SIZE
-                    flatten_binary_input = torch.zeros((XBAR_ROW_SIZE,16))
-                    for l in range(XBAR_ROW_SIZE):
-                        if x_i*XBAR_ROW_SIZE+l>=end_row:#flatten_input.shape[0]:
-                            break
-                        flatten_binary_input[l] = float_to_16bits(flatten_input[x_i*XBAR_ROW_SIZE+l])
-                    for x_j in range(xbar_col):
-                        xbars_out[x_j * 16:(x_j + 1) * 16] = mvm(xbars[:,:, x_i, x_j], flatten_binary_input)
-                output[:,i,j] += xbars_out[:weight_channels_out]
-                xbars_out.fill_(0)
+                input_temp = input_pad[:,:, i:i+weight_row, j:j+weight_col].reshape(input_batch,-1)    ## one set of inputs --> flatten: n x 1
+                flatten_binary_input_temp = float_to_16bits_tensor(input_temp, frac_bit, device)   # batch x n x 16
+                flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
+                flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch, xbars.shape[0],XBAR_ROW_SIZE, 16))
+                xbars_out = mvm_tensor(flatten_binary_input_xbar, xbars, device)   
+                output[:,:,i,j] += xbars_out[:, :weight_channels_out]
+
 
         ctx.save_for_backward(input, weight, bias)
         ctx.stride = stride
@@ -126,8 +110,8 @@ class Conv2d_mvm_function(Function):
         if bias is not None and ctx.needs_input_grad[2]:
             grad_bias = grad_output.sum((0,2,3)).squeeze(0)
             
-        print(grad_weight)
         return grad_input, grad_weight, grad_bias, None, None, None, None
+
 
 class _ConvNd_mvm(nn.Module):
 
