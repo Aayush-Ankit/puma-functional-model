@@ -99,7 +99,6 @@ def float_to_16bits_tensor(input, frac_bit, device): # input is batch x n tensor
     min_input = torch.ones(input.shape).mul_(-2**int_bit).to(device)
     input = torch.where(input < (2**int_bit-1/2**frac_bit), input, max_input)
     input = torch.where(input > -2**int_bit, input, min_input)
-
     batch_size = input.shape[0] 
     input.mul_(2**(frac_bit-8))  # 0000. 0000 0000 0000 --> 0000 0000. 0000 0000
     input = slicing(input,8)
@@ -112,19 +111,14 @@ def float_to_16bits_tensor(input, frac_bit, device): # input is batch x n tensor
     input.div_(2**2)
     input = slicing(input,2)
     # ------ 2-bit slice
-
     input.div_(2)
     input = slicing(input,1)    
     # ------ 1-bit slice
-    
-    input[0].abs_() # for negative numbers.  
-    input[-1]= torch.floor(input[-1])   # last layer
-    
+    input[:batch_size].abs_() # for negative numbers.  
+    input[-batch_size:]= torch.floor(input[-batch_size:])   # last layer
     input_idx = get_index_rearrange(idx16, batch_size)
     bit_slice = input[input_idx[0]].reshape(batch_size,16,-1).transpose(1,2)
-
     return bit_slice
-
 
 
 def mvm_tensor(flatten_input, xbars, device):   # version 2
@@ -149,13 +143,13 @@ def mvm_tensor(flatten_input, xbars, device):   # version 2
     
     output_reg = torch.zeros(batch_size, xbars_row, xbars_col, 16, int(XBAR_COL_SIZE/8)).to(device)
 
-    for i in range(int(XBAR_COL_SIZE/8)):
+    for i in range(16): # 16bit input
         input_1bit = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, 128, 1))
         output_analog = torch.sum(torch.mul(xbars, input_1bit), 3).reshape(shift_add_2bit.shape)
         output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_2bit), 4)
     output = torch.sum(torch.mul(output_reg, shift_add_1bit), 3)
     output.div_(2**12).trunc_().fmod_(2**16).div_(2**12)
-
+    
     # + sum xbar_rows
     output = torch.sum(output, 1).reshape(batch_size, -1)
     

@@ -38,7 +38,6 @@ class Conv2d_mvm_function(Function):
         flatten_weight = weight.reshape((weight_channels_out, length))  ## flatten weights
 
         flatten_bit_slice_weight = bit_slice(flatten_weight, frac_bit, device) ## v2: flatten weights --> fixed point --> bit slice -- v1
-
         # bitsliced weight into 128x128 xbars 
         # xbar_row separates inputs --> results in a same column with different rows will be added later
         xbar_row = math.ceil(flatten_bit_slice_weight.shape[0]/XBAR_ROW_SIZE)
