@@ -16,42 +16,45 @@ trainloader = [[inputs, labels]]
 #trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
 #trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
 
+inputs = torch.rand(2,16,5,5).mul_(2).sub_(1)
+weights = torch.rand(32,16,2,2)
+
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = Conv2d_mvm(3,2,2, bias=False)#, padding = 1)   # --> my custom module for mvm
-#        self.conv1 = nn.Conv2d(3,2,2, bias=False)
+        self.conv1 = nn.Conv2d(3,2,2, bias=False)
         self.conv1.weight.data = torch.clone(weights)
-#        self.conv1.weight.requires_grad = True
-
-        self.fc1 = nn.Linear(8, 2, bias=False)
 
     def forward(self, x):
         x = self.conv1(x)
-        print(x)    # checking output of mvm operation. 
-        x = x.view(-1, 8)
-        x = self.fc1(x)
+        return x
+
+
+
+class my_Net(nn.Module):
+    def __init__(self):
+        super(my_Net, self).__init__()
+        self.conv1 = Conv2d_mvm(3,2,2, bias=False)   # --> my custom module for mvm
+        self.conv1.weight.data = torch.clone(weights)
+
+    def forward(self, x):
+        x = self.conv1(x)
         return x
 
 
 net = Net()
+mynet = my_Net()
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print(device)
 net.to(device)
+mynet.to(device)
+inputs = inputs.to(device)
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
-for itr in range(1):
-    for i, data in enumerate(trainloader):
-        # get the inputs; data is a list of [inputs, labels]
-        inputs, labels = data
-        inputs, labels = inputs.to(device), labels.to(device)   
-        print(inputs) 
-        outputs = net(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-    
-        optimizer.step()
-        print(outputs)
+result_net = net(inputs)
+result_mynet = mynet(inputs)
+print(result_net[0,0])
+print(result_mynet[0,0])
+print(torch.norm(result_net-result_mynet))
+

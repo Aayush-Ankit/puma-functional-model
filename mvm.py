@@ -44,7 +44,7 @@ def get_index_rearrange(idx, out_ch):   # version 2
 def slicing(weight, n_bit): # version 2
   
     weight_int = torch.floor(weight)
-    weight_frac = weight.remainder_(1).mul_(2**n_bit)
+    weight_frac = weight.remainder(1).mul(2**n_bit)
     weight = torch.cat([weight_int, weight_frac])
     
     return weight
@@ -62,7 +62,6 @@ def bit_slice(weight, frac_bit, device):  # version 2
     min_weight = torch.ones(weight.shape).mul_(-2**int_bit).to(device)
     weight = torch.where(weight < (2**int_bit-1/2**frac_bit), weight, max_weight)
     weight = torch.where(weight > -2**int_bit, weight, min_weight)
-
     out_channel = weight.shape[0]
 
     weight.mul_(2**(frac_bit-8))  # 0000. 0000 0000 0000 --> 0000 0000. 0000 0000
@@ -71,22 +70,25 @@ def bit_slice(weight, frac_bit, device):  # version 2
 
     weight.div_(2**4)
     weight = slicing(weight,4)
-    # ------ 4-bit slice
+   # ------ 4-bit slice
 
     weight.div_(2**2)
     weight = slicing(weight,2)
     # ------ 2-bit slice
-    
     weight[:out_channel].add_(4).fmod_(4) # for negative numbers. 4 = 2**2. 
     weight[-out_channel:]= torch.floor(weight[-out_channel:])   # last layer
-
     # already made 2-bit. -> stop.
     # If I use 2^n bit-slice, I d(on't have to slice more to make 1-bits and then combine it again. 
 
     weight_idx = get_index_rearrange(idx8, out_channel)
-    bit_slice = weight[weight_idx[0],:].t()   
+    bitslice = weight.clone()
+    bitslice[weight_idx[0],:] = weight
+    bitslice = bitslice.t()
+    
+    del max_weight, min_weight
+    torch.cuda.empty_cache()
 
-    return bit_slice
+    return bitslice
 
 def float_to_16bits_tensor(input, frac_bit, device): # input is batch x n tensor / output is n x 16 tensor.. version 2
     #assume positive
@@ -118,17 +120,22 @@ def float_to_16bits_tensor(input, frac_bit, device): # input is batch x n tensor
     input[-batch_size:]= torch.floor(input[-batch_size:])   # last layer
     input_idx = get_index_rearrange(idx16, batch_size)
     bit_slice = input[input_idx[0]].reshape(batch_size,16,-1).transpose(1,2)
+
+    del max_input, min_input
+    torch.cuda.empty_cache()
+
     return bit_slice
 
 
 def mvm_tensor(flatten_input, xbars, device):   # version 2
 
     # xbars shape:          [xbars_row, xbars_col, XBAR_ROW_SIZE, XBAR_COL_SIZE]
-    # flatten_input shape:  [batch_size, xbars_row, 128, 16]
+    # flatten_input shape:  [batch_size, xbars_row, XBAR_ROW_SIZE, 16]
     # 2-bit bit-slicing
     xbars_row = xbars.shape[0]
     xbars_col = xbars.shape[1]
     batch_size = flatten_input.shape[0]
+
 
     shift_add_1bit = torch.zeros(16) # input bits = 16
     for i in range(16):
@@ -144,15 +151,20 @@ def mvm_tensor(flatten_input, xbars, device):   # version 2
     output_reg = torch.zeros(batch_size, xbars_row, xbars_col, 16, int(XBAR_COL_SIZE/8)).to(device)
 
     for i in range(16): # 16bit input
-        input_1bit = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, 128, 1))
-        output_analog = torch.sum(torch.mul(xbars, input_1bit), 3).reshape(shift_add_2bit.shape)
+        input_1bit = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
+        output_analog = torch.mul(xbars, input_1bit)
+        output_analog = torch.sum(output_analog,3)
+        output_analog=output_analog.reshape(shift_add_2bit.shape)
         output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_2bit), 4)
+
     output = torch.sum(torch.mul(output_reg, shift_add_1bit), 3)
     output.div_(2**12).trunc_().fmod_(2**16).div_(2**12)
     
     # + sum xbar_rows
     output = torch.sum(output, 1).reshape(batch_size, -1)
-    
+
+    del shift_add_1bit, shift_add_2bit, output_reg
+    torch.cuda.empty_cache()
     return output
 
 

@@ -16,15 +16,31 @@ normalize = transforms.Normalize( mean = [0.485, 0.456, 0.406], std = [0.229, 0.
 trainset = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor(), normalize]))
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True, num_workers=4)
 
+
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = Conv2d_mvm(3,16,3, padding = 1)
-#        self.conv1 = nn.Conv2d(3,16,3, padding=1)
-#        self.conv1.weight.data = torch.clone(weights)
-#        self.conv1.weight.requires_grad = True
+        self.conv3_64    = Conv2d_mvm(3,64,3, padding = 1)
+        self.conv64_64   = Conv2d_mvm(64,64,3, padding = 1)
+        self.conv64_128  = Conv2d_mvm(64,128,3, padding = 1)
+        self.conv128_128 = Conv2d_mvm(128,128,3, padding = 1)
+        self.conv128_256 = Conv2d_mvm(128,256,3, padding = 1)
+        self.conv256_256 = Conv2d_mvm(256,256,3, padding = 1)
+        self.conv256_512 = Conv2d_mvm(256,512,3, padding = 1)
+        self.conv512_512 = Conv2d_mvm(512,512,3, padding = 1)
         
-        self.fc1 = nn.Linear(16384, 100, bias=False)
+        self.relu = nn.ReLU(True)
+        self.pool = nn.MaxPool2d(2,2)
+
+        self.classifier = nn.Sequential(
+            nn.Linear(512, 512),
+            nn.ReLU(True),
+            nn.Linear(512, 512),
+            nn.ReLU(True),
+            nn.Linear(512, 100),
+        )
+
+
         for m in self.modules():
             if isinstance(m, Conv2d_mvm) or isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -35,12 +51,46 @@ class Net(nn.Module):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     def forward(self, x):
-        x = self.conv1(x)
-#        print(x.shape)
-#        x = x.to(device)
-        print(x)
-        x = x.view(-1, 16384)
-        x = self.fc1(x)
+        print("1st layer")
+        x = self.relu(self.conv3_64(x))
+        print("2nd layer")
+        x = self.relu(self.conv64_64(x))
+        x = self.pool(x)
+
+        x = self.relu(self.conv64_128(x))
+        print("3rd layer")
+        x = self.relu(self.conv128_128(x))
+        print("4th layer")
+        x = self.pool(x)
+
+        x = self.relu(self.conv128_256(x))
+        print("5th layer")
+        x = self.relu(self.conv256_256(x))
+        print("6th layer")
+        x = self.relu(self.conv256_256(x))
+        print("7th layer")
+        x = self.pool(x)
+
+        x = self.relu(self.conv256_512(x))
+        print("8th layer")
+        x = self.relu(self.conv512_512(x))
+        print("9th layer")
+        x = self.relu(self.conv512_512(x))
+        print("10th layer")
+        x = self.pool(x)
+
+
+        x = self.relu(self.conv512_512(x))
+        print("11tj layer")
+        x = self.relu(self.conv512_512(x))
+        print("12th layer")
+        x = self.relu(self.conv512_512(x))
+        print("13th layer")
+        x = self.pool(x)
+
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+
         return x
 
 
@@ -48,31 +98,26 @@ net = Net()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 net.to(device)
-print(net.conv1.weight.shape)
+#print(net.conv1.weight.shape)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
-for itr in range(10):
-    print(itr)
+for itr in range(1):
+    forward = 0
     for i, data in enumerate(trainloader):
-        begin = time.time()
-        # get the inputs; data is a list of [inputs, labels]
-#        if i%1 == 0:
-#            print(i)
         inputs, labels = data
-        inputs, labels = inputs.to(device), labels.to(device)    
+        torch.cuda.synchronize()
+        input_begin = time.perf_counter()
+        inputs, labels = inputs.to(device), labels.to(device)   
+        #print(time.perf_counter()-input_begin)
+
+        torch.cuda.synchronize()
+        forward_begin = time.perf_counter() 
         outputs = net(inputs)
-        forward = time.time()
-#        print("forward: ",forward-begin)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        backward = time.time()
-#        print("backward: ", backward-forward)
-         
 
-        optimizer.step()
-        update = time.time()
-#        print("update: ", update-backward)
+        forward_time = time.perf_counter() - forward_begin
+        #print(forward_time)
 
-#        print(outputs)
-        print(loss)
+        forward += forward_time
+        break
+
