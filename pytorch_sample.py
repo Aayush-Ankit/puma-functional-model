@@ -4,8 +4,15 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import sys
 
 from pytorch_mvm_class import *
+
+## To Indranil & Mustafa: This is for using 'for loops' in mvm_tensor. Just execute with '-i' at command line
+ind = False
+for i in range(len(sys.argv)):
+    if sys.argv[i] == '-i':
+        ind = True
 
 inputs = torch.tensor([[[[-1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]], [[[1.,0,1],[-2,1,0],[1,-2,1]],[[2,-3,1],[-2,0,-1],[4,-2,-1]],[[-3,2,1],[0,2,1],[-5,3,2]]]])/10
 #inputs = torch.tensor([[[[1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]], [[[-1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]]])
@@ -31,11 +38,10 @@ class Net(nn.Module):
         return x
 
 
-
 class my_Net(nn.Module):
     def __init__(self):
         super(my_Net, self).__init__()
-        self.conv1 = Conv2d_mvm(3,2,2, bias=False)   # --> my custom module for mvm
+        self.conv1 = Conv2d_mvm(3,2,2, bit_slice = 4, bit_stream = 1, bias=False, ind=ind)   # --> my custom module for mvm
         self.conv1.weight.data = torch.clone(weights)
 
     def forward(self, x):
@@ -55,7 +61,7 @@ inputs = inputs.to(device)
 
 result_net = net(inputs)
 result_mynet = mynet(inputs)
-print(result_net)#[0,:2])
-print(result_mynet)#[0,:2])
+#print(result_net)#[0,:2])
+#print(result_mynet)#[0,:2])
 print(torch.norm(result_net-result_mynet))
 

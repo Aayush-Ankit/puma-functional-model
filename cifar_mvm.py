@@ -5,13 +5,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import time
+import sys
 
 from pytorch_mvm_class import *
+## To Indranil & Mustafa: This is for using 'for loops' in mvm_tensor. Just execute with '-i' at command line
+ind = False
+for i in range(len(sys.argv)):
+    if sys.argv[i] == '-i':
+        ind = True
 
-#inputs = torch.tensor([[[[1.,0,1],[-2,1,0],[1,2,1]],[[2,3,1],[-2,0,1],[-4,2,1]],[[3,2,1],[0,2,1],[-5,3,2]]]])
-#labels = torch.tensor([1])
-#weights = torch.tensor([[[[-2.,1],[1,-2]],[[4,2],[0,1]],[[1,0],[3,2]]],[[[2.,1],[1,2]],[[3,2],[1,1]],[[1,-2],[-3,2]]]])/10
-#trainloader = [[inputs, labels]]
+
 normalize = transforms.Normalize( mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]) 
 trainset = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor(), normalize]))
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True, num_workers=4)
@@ -20,14 +23,14 @@ trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True,
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv3_64    = Conv2d_mvm(3,64,3, padding = 1)
-        self.conv64_64   = Conv2d_mvm(64,64,3, padding = 1)
-        self.conv64_128  = Conv2d_mvm(64,128,3, padding = 1)
-        self.conv128_128 = Conv2d_mvm(128,128,3, padding = 1)
-        self.conv128_256 = Conv2d_mvm(128,256,3, padding = 1)
-        self.conv256_256 = Conv2d_mvm(256,256,3, padding = 1)
-        self.conv256_512 = Conv2d_mvm(256,512,3, padding = 1)
-        self.conv512_512 = Conv2d_mvm(512,512,3, padding = 1)
+        self.conv3_64    = Conv2d_mvm(3,64,3, padding = 1, ind=ind)
+        self.conv64_64   = Conv2d_mvm(64,64,3, padding = 1, ind=ind)
+        self.conv64_128  = Conv2d_mvm(64,128,3, padding = 1, ind=ind)
+        self.conv128_128 = Conv2d_mvm(128,128,3, padding = 1, ind=ind)
+        self.conv128_256 = Conv2d_mvm(128,256,3, padding = 1, ind=ind)
+        self.conv256_256 = Conv2d_mvm(256,256,3, padding = 1, ind=ind)
+        self.conv256_512 = Conv2d_mvm(256,512,3, padding = 1, ind=ind)
+        self.conv512_512 = Conv2d_mvm(512,512,3, padding = 1, ind=ind)
         
         self.relu = nn.ReLU(True)
         self.pool = nn.MaxPool2d(2,2)

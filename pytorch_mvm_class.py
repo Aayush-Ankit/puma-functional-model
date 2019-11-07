@@ -19,16 +19,16 @@ class Conv2d_mvm_function(Function):
     # +--------------------------+
     # |            MVM           |   
     # +--------------------------+
-    def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1):
+    def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, bit_slice=2, bit_stream=1, ind=False):
        
         ## fixed-16: 
         ## sign     : 1 
         ## integer  : 3
         ## fraction : 12
         frac_bit = 12
-
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
         weight_channels_out = weight.shape[0]
         weight_channels_in = weight.shape[1]
         weight_row = weight.shape[2]
@@ -37,7 +37,7 @@ class Conv2d_mvm_function(Function):
         length = weight_channels_in * weight_row * weight_col
         flatten_weight = torch.zeros(weight_channels_out+1, length).to(device)     #####
         flatten_weight[:-1,:] = weight.reshape((weight_channels_out, length))  ## flatten weights
-        flatten_bit_slice_weight = bit_slice(flatten_weight, frac_bit, device) ## v2: flatten weights --> fixed point --> bit slice -- v1
+        flatten_bit_slice_weight = bit_slicing(flatten_weight, frac_bit, bit_slice, device) ## v2: flatten weights --> fixed point --> bit slice -- v1
 #        print(flatten_bit_slice_weight)
         # bitsliced weight into 128x128 xbars 
         # xbar_row separates inputs --> results in a same column with different rows will be added later
@@ -48,9 +48,8 @@ class Conv2d_mvm_function(Function):
         weight_xbar[:flatten_bit_slice_weight.shape[0], :flatten_bit_slice_weight.shape[1]] = flatten_bit_slice_weight
         xbars = torch.zeros((xbar_row, xbar_col, XBAR_ROW_SIZE, XBAR_COL_SIZE)).to(device)
 
-        bias_addr = [weight_channels_out//int(XBAR_COL_SIZE/8), weight_channels_out%int(XBAR_COL_SIZE/8)]      #####
-#        bias_addr = weight_channels_out
-        print(bias_addr)
+        bit_slice_num = int(16/bit_slice)
+        bias_addr = [weight_channels_out//int(XBAR_COL_SIZE/bit_slice_num), weight_channels_out%int(XBAR_COL_SIZE/bit_slice_num)]      #####
         for i in range(xbar_row):
             for j in range(xbar_col):
                 xbars[i,j] = weight_xbar[i*XBAR_ROW_SIZE:(i+1)*XBAR_ROW_SIZE, j*XBAR_COL_SIZE:(j+1)*XBAR_COL_SIZE]
@@ -75,7 +74,7 @@ class Conv2d_mvm_function(Function):
 #                print(flatten_binary_input_temp)
                 flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
                 flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch, xbars.shape[0],XBAR_ROW_SIZE, 16))
-                xbars_out = mvm_tensor(flatten_binary_input_xbar, bias_addr, xbars, device)   
+                xbars_out = mvm_tensor(flatten_binary_input_xbar, bias_addr, xbars, bit_slice, device, ind)   
                 output[:,:,i,j] += xbars_out[:, :weight_channels_out]
 
 
@@ -119,11 +118,11 @@ class Conv2d_mvm_function(Function):
 
 class _ConvNd_mvm(nn.Module):
 
-    __constants__ = ['stride', 'padding', 'dilation', 'groups', 'bias', 'padding_mode']
+    __constants__ = ['stride', 'padding', 'dilation', 'groups', 'bias', 'padding_mode', 'bit_slice', 'bit_stream', 'ind']
 
     def __init__(self, in_channels, out_channels, kernel_size, stride,
                  padding, dilation, transposed, output_padding,
-                 groups, bias, padding_mode, check_grad=False):
+                 groups, bias, padding_mode, bit_slice, bit_stream, ind, check_grad=False):
         super(_ConvNd_mvm, self).__init__()
         if in_channels % groups != 0:
             raise ValueError('in_channels must be divisible by groups')
@@ -139,6 +138,9 @@ class _ConvNd_mvm(nn.Module):
         self.output_padding = output_padding
         self.groups = groups
         self.padding_mode = padding_mode
+        self.bit_slice = bit_slice
+        self.bit_stream = bit_stream
+        self.ind = ind
 
         if check_grad:
             tensor_constructor = torch.DoubleTensor # double precision required to check grad
@@ -183,25 +185,19 @@ class _ConvNd_mvm(nn.Module):
 class Conv2d_mvm(_ConvNd_mvm):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1,
-                 bias=True, padding_mode='zeros', check_grad=False):
+                 bias=True, padding_mode='zeros', check_grad=False, bit_slice=2, bit_stream=1, ind=False):
         kernel_size = _pair(kernel_size)
         stride = _pair(stride)
         padding = _pair(padding)
         dilation = _pair(dilation)
+
         super(Conv2d_mvm, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
-            False, _pair(0), groups, bias, padding_mode)
+            False, _pair(0), groups, bias, padding_mode, bit_slice, bit_stream, ind)
     #@weak_script_method
     def forward(self, input):
-        if self.padding_mode == 'circular':
-            expanded_padding = ((self.padding[1] + 1) // 2, self.padding[1] // 2,
-                                (self.padding[0] + 1) // 2, self.padding[0] // 2)
-            return Conv2d_mvm_function.apply(F.pad(input, expanded_padding, mode='circular'),
-                            self.weight, self.bias, self.stride,
-                            _pair(0), self.dilation, self.groups)
-        else:
             return Conv2d_mvm_function.apply(input, self.weight, self.bias, self.stride,
-                            self.padding, self.dilation, self.groups)
+                   self.padding, self.dilation, self.groups, self.bit_slice, self.bit_stream, self.ind)
 
 
 
