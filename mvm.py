@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import math
+import time
 
 # this file will be replaced
  
@@ -155,8 +156,10 @@ def mvm_tensor(flatten_input, bias_addr, xbars, bit_slice, device, ind):   # ver
     output_reg = torch.zeros(batch_size, xbars_row, xbars_col, 16, int(XBAR_COL_SIZE/bit_slice_num)).to(device)
 
 # ---------------------------------------------------------- For Indranil & Mustafa -------------------------------------------------------------
-
     if ind == True:
+#        torch.cuda.synchronize()
+#        begin = time.perf_counter()
+   
         output_analog = torch.zeros(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
         for i in range(16):
             input_1bit = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
@@ -174,15 +177,22 @@ def mvm_tensor(flatten_input, bias_addr, xbars, bit_slice, device, ind):   # ver
                         output_analog[batch, xrow, xcol] = output_analog_xbar
             output_analog_=output_analog.reshape(shift_add_bit_slice.shape)
             output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog_, shift_add_bit_slice), 4)
+#        torch.cuda.synchronize()
+#        print(time.perf_counter() - begin)
 # -----------------------------------------------------------------------------------------------------------------------------------------------
 
     else:
+#        torch.cuda.synchronize()
+#        begin = time.perf_counter()
+
         for i in range(16): # 16bit input
             input_1bit = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
             output_analog = torch.mul(xbars, input_1bit)
             output_analog = torch.sum(output_analog,3)
             output_analog=output_analog.reshape(shift_add_bit_slice.shape)
             output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_bit_slice), 4)
+#        torch.cuda.synchronize()
+#        print(time.perf_counter() - begin)
 
     output = torch.sum(torch.mul(output_reg, shift_add_1bit), 3)
     # output shape: [batch_size, xbar_rows, xbar_cols, col_vals]

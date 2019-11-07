@@ -53,7 +53,6 @@ class Conv2d_mvm_function(Function):
         for i in range(xbar_row):
             for j in range(xbar_col):
                 xbars[i,j] = weight_xbar[i*XBAR_ROW_SIZE:(i+1)*XBAR_ROW_SIZE, j*XBAR_COL_SIZE:(j+1)*XBAR_COL_SIZE]
-#        xbars_out = torch.zeros(math.ceil(weight_channels_out/16)*16) # output of xbars 
 
         input_batch = input.shape[0]
         input_channels = input.shape[1]     # weight_channels_in == input_channels
@@ -71,7 +70,6 @@ class Conv2d_mvm_function(Function):
             for j in range(output_col):
                 input_temp = input_pad[:,:, i:i+weight_row, j:j+weight_col].reshape(input_batch,-1)    ## one set of inputs --> flatten: n x 1
                 flatten_binary_input_temp = float_to_16bits_tensor(input_temp, frac_bit, device)   # batch x n x 16
-#                print(flatten_binary_input_temp)
                 flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
                 flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch, xbars.shape[0],XBAR_ROW_SIZE, 16))
                 xbars_out = mvm_tensor(flatten_binary_input_xbar, bias_addr, xbars, bit_slice, device, ind)   
@@ -200,5 +198,99 @@ class Conv2d_mvm(_ConvNd_mvm):
                    self.padding, self.dilation, self.groups, self.bit_slice, self.bit_stream, self.ind)
 
 
+class Linear_mvm_function(Function):
 
+    # Note that both forward and backward are @staticmethods
+    @staticmethod
+    # bias is an optional argument
+    def forward(ctx, input, weight, bias=None, bit_slice=2, bit_stream=1, ind=False):
 
+        ## fixed-16: 
+        ## sign     : 1 
+        ## integer  : 3
+        ## fraction : 12
+        frac_bit = 12
+        
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        weight_channels_out = weight.shape[0]
+        weight_channels_in = weight.shape[1]
+        weight_bias = torch.zeros(weight_channels_out+1, weight_channels_in).to(device)
+        weight_bias[:-1,:] = weight
+
+        bit_slice_weight = bit_slicing(weight_bias, frac_bit, bit_slice, device) ## v2: flatten weights --> fixed point --> bit slice -- v1
+        # bitsliced weight into 128x128 xbars 
+        # xbar_row separates inputs --> results in a same column with different rows will be added later
+        xbar_row = math.ceil(bit_slice_weight.shape[0]/XBAR_ROW_SIZE)
+        xbar_col = math.ceil(bit_slice_weight.shape[1]/XBAR_COL_SIZE)
+
+        weight_xbar = torch.zeros((xbar_row*XBAR_ROW_SIZE, xbar_col*XBAR_COL_SIZE)).to(device)
+        weight_xbar[:bit_slice_weight.shape[0], :bit_slice_weight.shape[1]] = bit_slice_weight
+        xbars = torch.zeros((xbar_row, xbar_col, XBAR_ROW_SIZE, XBAR_COL_SIZE)).to(device)
+
+        bit_slice_num = int(16/bit_slice)
+        bias_addr = [weight_channels_out//int(XBAR_COL_SIZE/bit_slice_num), weight_channels_out%int(XBAR_COL_SIZE/bit_slice_num)]      #####
+        for i in range(xbar_row):
+            for j in range(xbar_col):
+                xbars[i,j] = weight_xbar[i*XBAR_ROW_SIZE:(i+1)*XBAR_ROW_SIZE, j*XBAR_COL_SIZE:(j+1)*XBAR_COL_SIZE]
+
+        input_batch = input.shape[0]
+        input_channels = input.shape[1]     # weight_channels_in == input_channels
+       
+        binary_input = torch.zeros(input_batch, xbars.shape[0]*XBAR_ROW_SIZE, 16).to(device)
+
+        binary_input[:,:input.shape[1]] = float_to_16bits_tensor(input, frac_bit, device)   # batch x n x 16
+
+        binary_input = binary_input.reshape((input_batch, xbars.shape[0], XBAR_ROW_SIZE, 16))
+        xbars_out = mvm_tensor(binary_input, bias_addr, xbars, bit_slice, device, ind)   
+        output = xbars_out[:, :weight_channels_out]
+ 
+        if bias is not None:
+            output += bias.unsqueeze(0).expand_as(output)
+        ctx.save_for_backward(input, weight, bias)
+
+        return output
+
+    # This function has only a single output, so it gets only one gradient
+    @staticmethod
+    def backward(ctx, grad_output):
+
+        input, weight, bias = ctx.saved_tensors
+        grad_input = grad_weight = grad_bias = None
+
+        if ctx.needs_input_grad[0]:
+            grad_input = grad_output.mm(weight)
+        if ctx.needs_input_grad[1]:
+            grad_weight = grad_output.t().mm(input)
+        if bias is not None and ctx.needs_input_grad[2]:
+            grad_bias = grad_output.sum(0).squeeze(0)
+
+        return grad_input, grad_weight, grad_bias
+
+class Linear_mvm(nn.Module):
+    def __init__(self, input_features, output_features, bias=True, bit_slice = 2, bit_stream = 1, ind = False):
+        super(Linear_mvm, self).__init__()
+        self.input_features = input_features
+        self.output_features = output_features
+        
+        self.weight = nn.Parameter(torch.Tensor(output_features, input_features))
+        if bias:
+            self.bias = nn.Parameter(torch.Tensor(output_features))
+            self.bias.data.uniform_(-0.1, 0.1) 
+        else:
+            self.register_parameter('bias', None)
+
+        self.bit_slice = bit_slice
+        self.bit_stream = bit_stream
+        self.ind = ind
+
+    def forward(self, input):
+        # See the autograd section for explanation of what happens here.
+        return Linear_mvm_function.apply(input, self.weight, self.bias, self.bit_slice, self.bit_stream, self.ind)
+
+    def extra_repr(self):
+        # (Optional)Set the extra information about this module. You can test
+        # it by printing an object of this class.
+        return 'in_features={}, out_features={}, bias={}'.format(
+            self.in_features, self.out_features, self.bias is not None
+        )

@@ -23,6 +23,15 @@ trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True,
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
+        self.conv3_64    = nn.Conv2d(3,64,3, padding = 1)
+        self.conv64_64   = nn.Conv2d(64,64,3, padding = 1)#, ind=ind)
+        self.conv64_128  = nn.Conv2d(64,128,3, padding = 1)#, ind=ind)
+        self.conv128_128 = nn.Conv2d(128,128,3, padding = 1)#, ind=ind)
+        self.conv128_256 = nn.Conv2d(128,256,3, padding = 1)#, ind=ind)
+        self.conv256_256 = nn.Conv2d(256,256,3, padding = 1)#, ind=ind)
+        self.conv256_512 = nn.Conv2d(256,512,3, padding = 1)#, ind=ind)
+        self.conv512_512 = nn.Conv2d(512,512,3, padding = 1)#, ind=ind)
+        """
         self.conv3_64    = Conv2d_mvm(3,64,3, padding = 1, ind=ind)
         self.conv64_64   = Conv2d_mvm(64,64,3, padding = 1, ind=ind)
         self.conv64_128  = Conv2d_mvm(64,128,3, padding = 1, ind=ind)
@@ -31,10 +40,13 @@ class Net(nn.Module):
         self.conv256_256 = Conv2d_mvm(256,256,3, padding = 1, ind=ind)
         self.conv256_512 = Conv2d_mvm(256,512,3, padding = 1, ind=ind)
         self.conv512_512 = Conv2d_mvm(512,512,3, padding = 1, ind=ind)
-        
+        """
+
         self.relu = nn.ReLU(True)
         self.pool = nn.MaxPool2d(2,2)
 
+        self.linear1 = nn.Linear(512,512)
+        print(self.linear1.weight.data.shape)
         self.classifier = nn.Sequential(
             nn.Linear(512, 512),
             nn.ReLU(True),
@@ -59,7 +71,7 @@ class Net(nn.Module):
         
         print("2nd layer")
         x = self.relu(self.conv64_64(x))
-        """
+        
         x = self.pool(x)
 
         x = self.relu(self.conv64_128(x))
@@ -92,10 +104,11 @@ class Net(nn.Module):
         x = self.relu(self.conv512_512(x))
         print("13th layer")
         x = self.pool(x)
-
+        print(x.shape)
         x = x.view(x.size(0), -1)
+        print(x.shape)
         x = self.classifier(x)
-        """
+        
         return x
 
 
