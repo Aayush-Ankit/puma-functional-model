@@ -7,17 +7,18 @@ import torch.optim as optim
 
 from pytorch_mvm_class import *
 
-inputs = torch.tensor([[[[1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]], [[[1.,0,1],[-2,1,0],[1,-2,1]],[[2,-3,1],[-2,0,-1],[4,-2,-1]],[[-3,2,1],[0,2,1],[-5,3,2]]]])
+inputs = torch.tensor([[[[-1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]], [[[1.,0,1],[-2,1,0],[1,-2,1]],[[2,-3,1],[-2,0,-1],[4,-2,-1]],[[-3,2,1],[0,2,1],[-5,3,2]]]])/10
 #inputs = torch.tensor([[[[1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]], [[[-1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]]])
 
 labels = torch.tensor([1, 1])
-weights = torch.tensor([[[[2.,1],[1,2]],[[4,2],[0,1]],[[1,0],[3,2]]],[[[2.,1],[1,2]],[[3,2],[1,1]],[[1,2],[3,2]]]])/10
+weights = torch.tensor([[[[-2.,1],[-1,2]],[[-4,2],[0,1]],[[-1,0],[-3,-2]]],[[[2.,1],[1,2]],[[3,2],[1,1]],[[1,2],[3,2]]]])/10
 trainloader = [[inputs, labels]]
 #trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
 #trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
 
 inputs = torch.rand(2,16,5,5).mul_(2).sub_(1)
-weights = torch.rand(32,16,2,2)
+weights = torch.rand(32,16,2,2).sub_(0.5)
+
 
 class Net(nn.Module):
     def __init__(self):
@@ -54,7 +55,7 @@ inputs = inputs.to(device)
 
 result_net = net(inputs)
 result_mynet = mynet(inputs)
-print(result_net[0,0])
-print(result_mynet[0,0])
+print(result_net)#[0,:2])
+print(result_mynet)#[0,:2])
 print(torch.norm(result_net-result_mynet))
 

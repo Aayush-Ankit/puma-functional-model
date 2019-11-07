@@ -35,9 +35,10 @@ class Conv2d_mvm_function(Function):
         weight_col = weight.shape[3]
 
         length = weight_channels_in * weight_row * weight_col
-        flatten_weight = weight.reshape((weight_channels_out, length))  ## flatten weights
+        flatten_weight = torch.zeros(weight_channels_out+1, length).to(device)     #####
+        flatten_weight[:-1,:] = weight.reshape((weight_channels_out, length))  ## flatten weights
         flatten_bit_slice_weight = bit_slice(flatten_weight, frac_bit, device) ## v2: flatten weights --> fixed point --> bit slice -- v1
-
+#        print(flatten_bit_slice_weight)
         # bitsliced weight into 128x128 xbars 
         # xbar_row separates inputs --> results in a same column with different rows will be added later
         xbar_row = math.ceil(flatten_bit_slice_weight.shape[0]/XBAR_ROW_SIZE)
@@ -47,10 +48,13 @@ class Conv2d_mvm_function(Function):
         weight_xbar[:flatten_bit_slice_weight.shape[0], :flatten_bit_slice_weight.shape[1]] = flatten_bit_slice_weight
         xbars = torch.zeros((xbar_row, xbar_col, XBAR_ROW_SIZE, XBAR_COL_SIZE)).to(device)
 
+        bias_addr = [weight_channels_out//int(XBAR_COL_SIZE/8), weight_channels_out%int(XBAR_COL_SIZE/8)]      #####
+#        bias_addr = weight_channels_out
+        print(bias_addr)
         for i in range(xbar_row):
             for j in range(xbar_col):
                 xbars[i,j] = weight_xbar[i*XBAR_ROW_SIZE:(i+1)*XBAR_ROW_SIZE, j*XBAR_COL_SIZE:(j+1)*XBAR_COL_SIZE]
-        xbars_out = torch.zeros(math.ceil(weight_channels_out/16)*16) # output of xbars 
+#        xbars_out = torch.zeros(math.ceil(weight_channels_out/16)*16) # output of xbars 
 
         input_batch = input.shape[0]
         input_channels = input.shape[1]     # weight_channels_in == input_channels
@@ -68,9 +72,10 @@ class Conv2d_mvm_function(Function):
             for j in range(output_col):
                 input_temp = input_pad[:,:, i:i+weight_row, j:j+weight_col].reshape(input_batch,-1)    ## one set of inputs --> flatten: n x 1
                 flatten_binary_input_temp = float_to_16bits_tensor(input_temp, frac_bit, device)   # batch x n x 16
+#                print(flatten_binary_input_temp)
                 flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
                 flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch, xbars.shape[0],XBAR_ROW_SIZE, 16))
-                xbars_out = mvm_tensor(flatten_binary_input_xbar, xbars, device)   
+                xbars_out = mvm_tensor(flatten_binary_input_xbar, bias_addr, xbars, device)   
                 output[:,:,i,j] += xbars_out[:, :weight_channels_out]
 
 

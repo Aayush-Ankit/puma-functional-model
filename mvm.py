@@ -53,7 +53,7 @@ def slicing(weight, n_bit): # version 2
 def bit_slice(weight, frac_bit, device):  # version 2
 
     #assume positive
-    # weight.shape[0] is output channels
+    # weight.shape[0] is output channels + 1 (bias)
     # weight.shape[1] is flattened weight length
 
     int_bit = 15-frac_bit
@@ -75,8 +75,9 @@ def bit_slice(weight, frac_bit, device):  # version 2
     weight.div_(2**2)
     weight = slicing(weight,2)
     # ------ 2-bit slice
-    weight[:out_channel].add_(4).fmod_(4) # for negative numbers. 4 = 2**2. 
+    weight[:out_channel].add_(2)#.fmod_(4)# with bias ## .fmod_(4) # for negative numbers. 4 = 2**2. 
     weight[-out_channel:]= torch.floor(weight[-out_channel:])   # last layer
+
     # already made 2-bit. -> stop.
     # If I use 2^n bit-slice, I d(on't have to slice more to make 1-bits and then combine it again. 
 
@@ -84,7 +85,7 @@ def bit_slice(weight, frac_bit, device):  # version 2
     bitslice = weight.clone()
     bitslice[weight_idx[0],:] = weight
     bitslice = bitslice.t()
-    
+
     del max_weight, min_weight
     torch.cuda.empty_cache()
 
@@ -119,7 +120,9 @@ def float_to_16bits_tensor(input, frac_bit, device): # input is batch x n tensor
     input[:batch_size].abs_() # for negative numbers.  
     input[-batch_size:]= torch.floor(input[-batch_size:])   # last layer
     input_idx = get_index_rearrange(idx16, batch_size)
-    bit_slice = input[input_idx[0]].reshape(batch_size,16,-1).transpose(1,2)
+    bit_slice = input.clone()
+    bit_slice[input_idx[0]] = input
+    bit_slice = bit_slice.reshape(batch_size, 16, -1).transpose(1,2)
 
     del max_input, min_input
     torch.cuda.empty_cache()
@@ -127,7 +130,7 @@ def float_to_16bits_tensor(input, frac_bit, device): # input is batch x n tensor
     return bit_slice
 
 
-def mvm_tensor(flatten_input, xbars, device):   # version 2
+def mvm_tensor(flatten_input, bias_addr, xbars, device):   # version 2
 
     # xbars shape:          [xbars_row, xbars_col, XBAR_ROW_SIZE, XBAR_COL_SIZE]
     # flatten_input shape:  [batch_size, xbars_row, XBAR_ROW_SIZE, 16]
@@ -158,14 +161,24 @@ def mvm_tensor(flatten_input, xbars, device):   # version 2
         output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_2bit), 4)
 
     output = torch.sum(torch.mul(output_reg, shift_add_1bit), 3)
-    output.div_(2**12).trunc_().fmod_(2**16).div_(2**12)
+    # output shape: [batch_size, xbar_rows, xbar_cols, col_vals]
+    subt = output[:, :, bias_addr[0], bias_addr[1]].expand(output.shape[2], output.shape[3],-1,-1).permute(2,3,0,1)
+    output.sub_(subt)
+     
+    output.div_(2**12)
+    output.trunc_()
+    output.fmod_(2**16)
+    output.div_(2**12)
+
     
     # + sum xbar_rows
     output = torch.sum(output, 1).reshape(batch_size, -1)
 
     del shift_add_1bit, shift_add_2bit, output_reg
     torch.cuda.empty_cache()
+
     return output
+
 
 
 

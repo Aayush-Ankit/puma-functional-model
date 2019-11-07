@@ -53,8 +53,10 @@ class Net(nn.Module):
     def forward(self, x):
         print("1st layer")
         x = self.relu(self.conv3_64(x))
+        
         print("2nd layer")
         x = self.relu(self.conv64_64(x))
+        """
         x = self.pool(x)
 
         x = self.relu(self.conv64_128(x))
@@ -90,7 +92,7 @@ class Net(nn.Module):
 
         x = x.view(x.size(0), -1)
         x = self.classifier(x)
-
+        """
         return x
 
 
