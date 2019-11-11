@@ -2,11 +2,12 @@ import numpy as np
 import torch
 import math
 import time
+import pdb
 
 # this file will be replaced
  
-XBAR_COL_SIZE = 128
-XBAR_ROW_SIZE = 128
+XBAR_COL_SIZE = 64
+XBAR_ROW_SIZE = 64
 
 
 def get_tree_index(idx):    # version 2
@@ -154,31 +155,53 @@ def mvm_tensor(flatten_input, bias_addr, xbars, bit_slice, device, ind):   # ver
     shift_add_bit_slice = shift_add_bit_slice.expand((batch_size, xbars_row, xbars_col, int(XBAR_COL_SIZE/bit_slice_num), bit_slice_num)).to(device)
     
     output_reg = torch.zeros(batch_size, xbars_row, xbars_col, 16, int(XBAR_COL_SIZE/bit_slice_num)).to(device)
-
 # ---------------------------------------------------------- For Indranil & Mustafa -------------------------------------------------------------
     if ind == True:
 #        torch.cuda.synchronize()
 #        begin = time.perf_counter()
    
         output_analog = torch.zeros(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
+       # output_analog1 = torch.zeros(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
+
         for i in range(16):
             input_1bit = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
-            for batch in range(batch_size):
-                for xrow in range(xbars_row):
-                    for xcol in range(xbars_col):
- 
+            #for batch in range(batch_size):
+            for xrow in range(xbars_row):
+                 for xcol in range(xbars_col):
                      # ----- Put your own function here -----
-
-                        output_analog_xbar = torch.mul(xbars[xrow, xcol], input_1bit[batch, xrow, 0])   # Product of each elements : [128 x 128]
-                        output_analog_xbar = torch.sum(output_analog_xbar, 0)    # output of one xbar : array of 128 currents
-
+                        #input_t = input_1bit[:,xrow,0].t()
+                        #output_analog_xbar = input_t.mm(xbars[xrow, xcol]) #edit IC
+                        pdb.set_trace()
+                        V_real = input_1bit*0.25/15
+                        G_real = xbars[xrow, xcol]*(1/100 - 1/600)/15 +1/600
+                        output_analog_xbar = torch.mul(xbars[xrow, xcol], input_1bit[:, xrow, 0])   # Product of each elements : [128 x 128]
+                        output_analog_xbar = torch.sum(output_analog_xbar, 2)    # output of one xbar : array of 128 currents
+                        #pdb.set_trace()
                      # --------------------------------------
 
-                        output_analog[batch, xrow, xcol] = output_analog_xbar
+                        output_analog[:, xrow, xcol] = output_analog_xbar
+#---------------------------------------------------------With Batchsize Loop---------------------------------------------			
+      #      for batch in range(batch_size):
+      #          for xrow in range(xbars_row):
+      #              for xcol in range(xbars_col):
+ 
+      #               # ----- Put your own function here -----
+      #                  #input_t = input_1bit[:,xrow,0].t()
+      #                  #output_analog_xbar = input_t.mm(xbars[xrow, xcol]) #edit IC
+      #                  #pdb.set_trace()
+      #                  output_analog_xbar1 = torch.mul(xbars[xrow, xcol], input_1bit[batch, xrow, 0])   # Product of each elements : [128 x 128]
+      #                  output_analog_xbar1 = torch.sum(output_analog_xbar1, 1)    # output of one xbar : array of 128 currents
+      #                  #pdb.set_trace()
+      #               # --------------------------------------
+
+      #                  output_analog1[batch, xrow, xcol] = output_analog_xbar1
+      #      pdb.set_trace()
+      
             output_analog_=output_analog.reshape(shift_add_bit_slice.shape)
             output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog_, shift_add_bit_slice), 4)
 #        torch.cuda.synchronize()
 #        print(time.perf_counter() - begin)
+
 # -----------------------------------------------------------------------------------------------------------------------------------------------
 
     else:
