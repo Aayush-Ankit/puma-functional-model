@@ -1,0 +1,202 @@
+import torch.nn as nn
+import torch
+import torch.nn.functional as F
+import sys
+import time
+from pytorch_mvm_class import *
+__all__ = ['vgg_mvm']
+
+
+  
+class vgg16(nn.Module):
+
+    def __init__(self):
+        super(vgg16, self).__init__()
+
+    def forward(self, x):
+        t = time.time()
+        x = self.conv1(x)
+        x = F.relu(x)
+        x = self.bn1(x)
+        x = self.conv2(x)
+        x = F.relu(x)
+        x = self.bn2(x)
+        #x = self.maxpool1(x)
+
+        x = self.conv3(x)
+        x = F.relu(x)
+        x = self.bn3(x)
+        x = self.conv4(x)
+        x = F.relu(x)
+        x = self.bn4(x)
+        #x = self.maxpool2(x)
+
+        x = self.conv5(x)
+        x = F.relu(x)
+        x = self.bn5(x)
+        x = self.conv6(x)
+        x = F.relu(x)
+        x = self.bn6(x)
+        #x = self.maxpool3(x)
+
+        x = self.conv7(x)
+        x = F.relu(x)
+        x = self.bn7(x)
+        x = self.conv8(x)
+        x = F.relu(x)
+        x = self.bn8(x)
+        #x = self.maxpool4(x)
+
+
+        x = self.conv9(x)
+        x = F.relu(x)
+        x = self.bn9(x)
+        x = self.conv10(x)
+        x = F.relu(x)
+        x = self.bn10(x)
+        #x = self.maxpool5(x)
+
+        x = self.conv11(x)
+        x = F.relu(x)
+        x = self.bn11(x)
+        x = self.conv12(x)
+        x = F.relu(x)
+        x = self.bn12(x)
+        x = self.conv13(x)
+        x = F.relu(x)
+        x = self.bn13(x)
+        #x = self.maxpool5(x)
+        x = self.avgpool(x)
+        x = x.view(x.size(0),-1)
+        x = self.linear(x)
+        t1 = time.time()
+        print('Time taken: ',t1-t)
+        return x
+
+class VGG_cifar100(vgg16):
+
+    def __init__(self, ind,num_classes=100):
+        super(VGG_cifar100, self).__init__()
+        self.conv1 = Conv2d_mvm(3,64,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        #self.conv1.weight.data = torch.clone(weights_conv[0])
+        # print(ind)
+        # input()
+        self.bn1 = nn.BatchNorm2d(64)
+        # self.bn1.bias.data.zero_()
+        # self.bn1.weight.data.fill_(1)
+
+
+        self.conv2 = Conv2d_mvm(64,64,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        #self.conv2.weight.data = torch.clone(weights_conv[1])
+        self.maxpool1 = nn.MaxPool2d(2,2)
+
+        self.bn2 = nn.BatchNorm2d(64)
+        # self.bn2.bias.data.zero_() 
+        # self.bn2.weight.data.fill_(1)
+
+
+        self.conv3 = Conv2d_mvm(64,64,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        # self.conv3.weight.data = torch.clone(weights_conv[2])
+
+        self.bn3 = nn.BatchNorm2d(64)
+        # self.bn3.bias.data.zero_() 
+        # self.bn3.weight.data.fill_(1)
+
+
+        self.conv4 = Conv2d_mvm(64,64,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        # self.conv4.weight.data = torch.clone(weights_conv[3])
+
+        self.bn4 = nn.BatchNorm2d(64)
+        # self.bn4.bias.data.zero_() 
+        # self.bn4.weight.data.fill_(1)
+
+        self.maxpool2 = nn.MaxPool2d(2,2)
+
+        self.conv5 = Conv2d_mvm(64,64,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        # self.conv5.weight.data = torch.clone(weights_conv[4])
+
+        self.bn5 = nn.BatchNorm2d(64)
+        # self.bn5.bias.data.zero_() 
+        # self.bn5.weight.data.fill_(1)
+
+
+        self.conv6= Conv2d_mvm(64,128,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        # self.conv6.weight.data = torch.clone(weights_conv[5])
+
+        self.bn6= nn.BatchNorm2d(128)
+        # self.bn6.bias.data.zero_() 
+        # self.bn6.weight.data.fill_(1)
+
+
+        self.conv7 = Conv2d_mvm(128,128,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        # self.conv7.weight.data = torch.clone(weights_conv[6])
+        
+        self.bn7 = nn.BatchNorm2d(128)
+        # self.bn7.bias.data.zero_() 
+        # self.bn7.weight.data.fill_(1)
+        
+        self.maxpool3 = nn.MaxPool2d(2,2)
+        
+        
+        self.conv8 = Conv2d_mvm(128,128,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        # self.conv8.weight.data = torch.clone(weights_conv[7])
+        
+        self.bn8 = nn.BatchNorm2d(128)
+        # self.bn8.bias.data.zero_() 
+        # self.bn8.weight.data.fill_(1)
+        
+        self.conv9 = Conv2d_mvm(128,128,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        # self.conv9.weight.data = torch.clone(weights_conv[8])
+        
+        self.bn9 = nn.BatchNorm2d(128)
+        # self.bn9.bias.data.zero_() 
+        # self.bn9.weight.data.fill_(1)
+        
+        self.maxpool4 = nn.MaxPool2d(2,2)
+        
+        self.conv10 = Conv2d_mvm(128,256,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        # self.conv10.weight.data = torch.clone(weights_conv[9])
+        
+        self.bn10 = nn.BatchNorm2d(256)
+        # self.bn10.bias.data.zero_() 
+        # self.bn10.weight.data.fill_(1)
+
+        self.conv11 = Conv2d_mvm(256,256,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        # self.conv11.weight.data = torch.clone(weights_conv[10])
+        
+        self.bn11 = nn.BatchNorm2d(256)
+        # self.bn11.bias.data.zero_() 
+        # self.bn11.weight.data.fill_(1)
+
+        self.conv12 = Conv2d_mvm(256,256,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        # self.conv12.weight.data = torch.clone(weights_conv[11])
+        
+        self.bn12 = nn.BatchNorm2d(256)
+        # self.bn12.bias.data.zero_() 
+        # self.bn12.weight.data.fill_(1)
+
+        self.conv13 = Conv2d_mvm(256,256,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        # self.conv13.weight.data = torch.clone(weights_conv[12])
+        
+        self.bn13 = nn.BatchNorm2d(256)
+        # self.bn13.bias.data.zero_() 
+        # self.bn13.weight.data.fill_(1)
+
+        self.maxpool5 = nn.MaxPool2d(2,2)
+        
+        
+        self.avgpool = nn.AvgPool2d(6)
+        
+        self.linear = Linear_mvm(256,10, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        # self.linear.weight.data = torch.clone(weights_lin)
+
+
+
+def vgg_mvm(ind,**kwargs):
+    num_classes, depth, dataset = map(
+        kwargs.get, ['num_classes', 'depth', 'dataset'])
+    num_classes = 100
+    return VGG_cifar100(ind,num_classes=num_classes)
+    #if dataset == 'cifar100':
+        
+        

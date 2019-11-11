@@ -1,13 +1,36 @@
 import numpy as np
 import torch
 import math
-import time
 import pdb
+import torch.nn as nn
+import torch.nn.functional as F
+import sys
+import time
 
 # this file will be replaced
  
 XBAR_COL_SIZE = 64
 XBAR_ROW_SIZE = 64
+
+class NN_model(nn.Module):
+    def __init__(self):
+         super(NN_model, self).__init__()
+         self.fc1 = nn.Linear(4160, 10000)
+         self.relu1 = nn.ReLU(inplace=True)
+         self.do2 = nn.Dropout(0.5)
+         self.fc3 = nn.Linear(10000,64)
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        #pdb.set_trace()
+        out = self.fc1(x)
+        out = self.relu1(out)
+        out = self.do2(out)
+        out = self.fc3(out)
+        return out
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = NN_model()
+model.cuda()       
+
 
 
 def get_tree_index(idx):    # version 2
@@ -159,27 +182,59 @@ def mvm_tensor(flatten_input, bias_addr, xbars, bit_slice, device, ind):   # ver
     if ind == True:
 #        torch.cuda.synchronize()
 #        begin = time.perf_counter()
-   
+        Gon = 1/100
+        Goff = 1/600
+        Nstates_slice = 15
+        Nstates_stream = 1
+        Vmax = 0.25
+        Goffmat = Goff*torch.ones(XBAR_ROW_SIZE,XBAR_COL_SIZE).to(device)
+        Comp_factor = Nstates_slice*Nstates_stream/((Gon-Goff)*Vmax)
+        inmax_V = Vmax
+        inmin_V = 0
+
         output_analog = torch.zeros(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
        # output_analog1 = torch.zeros(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
 
         for i in range(16):
             input_1bit = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
+            Goffmat = Goff*torch.ones(batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1).to(device)
+            V_real = input_1bit*Vmax/Nstates_stream
+            # V_real_scaled = [(V_real-inmin_V)/(inmax_V-inmin_V)]
+            G_real = xbars*(Gon - Goff)/Nstates_slice +Goff
+            # G_real_scaled = [(G_real-Goff)/(Gon-Goff)]
+            output_bias_all = XBAR_ROW_SIZE*torch.mul(Goffmat,V_real)
             #for batch in range(batch_size):
             for xrow in range(xbars_row):
                  for xcol in range(xbars_col):
                      # ----- Put your own function here -----
                         #input_t = input_1bit[:,xrow,0].t()
                         #output_analog_xbar = input_t.mm(xbars[xrow, xcol]) #edit IC
-                        pdb.set_trace()
-                        V_real = input_1bit*0.25/15
-                        G_real = xbars[xrow, xcol]*(1/100 - 1/600)/15 +1/600
-                        output_analog_xbar = torch.mul(xbars[xrow, xcol], input_1bit[:, xrow, 0])   # Product of each elements : [128 x 128]
-                        output_analog_xbar = torch.sum(output_analog_xbar, 2)    # output of one xbar : array of 128 currents
+                        
+                        #----------------V, G Conversion Start--------------------
+                        #t1 = time.time()
+                        output_real = torch.mul(G_real[xrow,xcol], V_real[:, xrow, 0])
+                        output_real = torch.sum(output_real,2)
+                        #output_bias = torch.mul(Goffmat,V_real[:,xrow,0])
+                        output_bias = output_bias_all[:, xrow, 0].view(batch_size,XBAR_ROW_SIZE)
+                        output_analog_xbar_real = ((output_real-output_bias)*Comp_factor)
+                        #output_analog_xbar_real = torch.round(output_analog_xbar_real)
+                        #t2 = time.time()
+                        #print('Time taken for V-G', t2-t1)
+
+                        #----------------V, G Conversion End--------------------
+
+                        #t1 = time.time()
+
+                        #output_analog_xbar = torch.mul(xbars[xrow, xcol], input_1bit[:, xrow, 0])   # Product of each elements : [128 x 128]
+                        #output_analog_xbar = torch.sum(output_analog_xbar, 2)    # output of one xbar : array of 128 currents
                         #pdb.set_trace()
+                        #t2 = time.time()
+                        #print('Time taken for normal', t2-t1)
+                        #input()
                      # --------------------------------------
 
-                        output_analog[:, xrow, xcol] = output_analog_xbar
+                        output_analog[:, xrow, xcol] = output_analog_xbar_real
+
 #---------------------------------------------------------With Batchsize Loop---------------------------------------------			
       #      for batch in range(batch_size):
       #          for xrow in range(xbars_row):
@@ -196,7 +251,7 @@ def mvm_tensor(flatten_input, bias_addr, xbars, bit_slice, device, ind):   # ver
 
       #                  output_analog1[batch, xrow, xcol] = output_analog_xbar1
       #      pdb.set_trace()
-      
+            output_analog_ = torch.round(output_analog)
             output_analog_=output_analog.reshape(shift_add_bit_slice.shape)
             output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog_, shift_add_bit_slice), 4)
 #        torch.cuda.synchronize()
@@ -207,7 +262,7 @@ def mvm_tensor(flatten_input, bias_addr, xbars, bit_slice, device, ind):   # ver
     else:
 #        torch.cuda.synchronize()
 #        begin = time.perf_counter()
-
+        # pdb.set_trace()
         for i in range(16): # 16bit input
             input_1bit = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
             output_analog = torch.mul(xbars, input_1bit)
