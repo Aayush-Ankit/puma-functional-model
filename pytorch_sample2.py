@@ -17,8 +17,8 @@ trainloader = [[inputs, labels]]
 #trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
 #trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
 
-inputs = torch.rand(64,512,32,32).sub(0.5).mul(0.5)
-weights = torch.rand(256,512,3,3).sub(0.5).mul(0.5)
+inputs = torch.rand(64,128,32,32).sub(0.5).mul(0.5)
+weights = torch.rand(256,128,3,3).sub(0.5).mul(0.5)
 
 
 class Net(nn.Module):
@@ -63,9 +63,10 @@ print(end-begin)
 result_mynet = mynet(inputs)
 
 torch.cuda.synchronize()
-print(time.time-end)
+end2 = time.time()
+print(end2-end)
 
-#print(result_net)#[0,:2])
-#print(result_mynet)#[0,:2])
+print(result_net[0][0][0])#[0,:2])
+print(result_mynet[0][0][0])#[0,:2])
 print(torch.norm(result_net-result_mynet))
 
