@@ -163,8 +163,10 @@ def mvm_tensor(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slice, b
 
         for i in range(bit_stream_num): # 16bit input
             input_stream = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
+            #####
             output_analog = torch.mul(xbars, input_stream)
             output_analog = torch.sum(output_analog,3)
+            #####
             output_analog=output_analog.reshape(shift_add_bit_slice.shape)
             output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_bit_slice), 4)
 
@@ -182,8 +184,10 @@ def mvm_tensor(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slice, b
 
         for i in range(bit_stream_num): # 16bit input
             input_stream = input_split[:,:,:,:,-1-i].reshape((2, batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
+            #####
             output_analog = torch.mul(xbars, input_stream)
             output_analog = torch.sum(output_analog,4)
+            ####
             output_analog=output_analog.reshape(shift_add_bit_slice.shape)
             output_reg[:,:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_bit_slice), 5) # -1
         output_split = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 4)

@@ -66,8 +66,8 @@ class Conv2d_mvm_function(Function):
         pos = torch.ones(input_batch, input_channels, weight_row, weight_col).reshape(input_batch,-1).to(device)
         neg = pos.clone().fill_(0)
         
-        output_row = input_row - weight_row + 1
-        output_col = input_col - weight_col + 1 
+        output_row = (input_row - weight_row)//stride[0] + 1
+        output_col = (input_col - weight_col)//stride[1] + 1 
         output = torch.zeros((input_batch, weight_channels_out, output_row, output_col)).to(device)
         flatten_binary_input = torch.zeros(input_batch, xbars.shape[0]*XBAR_ROW_SIZE, bit_stream_num).to(device)
         flatten_input_sign_temp = torch.zeros(input_batch, xbars.shape[0]*XBAR_ROW_SIZE, bit_stream_num).to(device)
@@ -75,7 +75,7 @@ class Conv2d_mvm_function(Function):
 
         for i in range(output_row):
             for j in range(output_col):
-                input_temp = input_pad[:,:, i:i+weight_row, j:j+weight_col].reshape(input_batch,-1)    ## one set of inputs --> flatten: n x 1
+                input_temp = input_pad[:,:, stride[0]*i:stride[0]*i+weight_row, stride[1]*j:stride[1]*j+weight_col].reshape(input_batch,-1)    ## one set of inputs --> flatten: n x 1
                 if bit_stream > 1:
                     flatten_input_sign = torch.where(input_temp > 0, pos, neg).expand(bit_stream_num,-1,-1).permute(1,2,0)
                     flatten_input_sign_temp[:,:flatten_input_sign.shape[1]] = flatten_input_sign
@@ -243,7 +243,9 @@ class Linear_mvm_function(Function):
         weight_xbar[:bit_slice_weight.shape[0], :bit_slice_weight.shape[1]] = bit_slice_weight
         xbars = torch.zeros((xbar_row, xbar_col, XBAR_ROW_SIZE, XBAR_COL_SIZE)).to(device)
 
-        bit_slice_num = int(16/bit_slice)
+        bit_slice_num = 16/bit_slice
+        bit_stream_num = 16//bit_stream
+
         bias_addr = [weight_channels_out//int(XBAR_COL_SIZE/bit_slice_num), weight_channels_out%int(XBAR_COL_SIZE/bit_slice_num)]      #####
         for i in range(xbar_row):
             for j in range(xbar_col):
@@ -251,15 +253,23 @@ class Linear_mvm_function(Function):
 
         input_batch = input.shape[0]
         input_channels = input.shape[1]     # weight_channels_in == input_channels
-       
-        binary_input = torch.zeros(input_batch, xbars.shape[0]*XBAR_ROW_SIZE, 16).to(device)
+        pos = torch.ones(input.shape).to(device)
+        neg = pos.clone().fill_(0)      
 
-        pos = torch.ones(input.shape)
+        binary_input = torch.zeros(input_batch, xbars.shape[0]*XBAR_ROW_SIZE, bit_stream_num).to(device)
+        input_sign_temp = torch.zeros(input_batch, xbars.shape[0]*XBAR_ROW_SIZE, bit_stream_num).to(device)
+        input_sign_xbar = torch.zeros(input_batch, xbars.shape[0],XBAR_ROW_SIZE, bit_stream_num).to(device)
+
+        if bit_stream > 1:
+            input_sign = torch.where(input > 0, pos, neg).expand(bit_stream_num, -1, -1).permute(1,2,0)
+            input_sign_temp[:,:input_sign.shape[1]] = input_sign
+            input_sign_xbar = input_sign_temp.reshape(input_batch, xbars.shape[0],XBAR_ROW_SIZE, bit_stream_num)
+            input.abs_()
 
         binary_input[:,:input.shape[1]] = float_to_16bits_tensor(input, frac_bit, bit_stream, device)   # batch x n x 16
 
-        binary_input = binary_input.reshape((input_batch, xbars.shape[0], XBAR_ROW_SIZE, 16))
-        xbars_out = mvm_tensor(binary_input, bias_addr, xbars, bit_slice, device, ind)   
+        binary_input = binary_input.reshape((input_batch, xbars.shape[0], XBAR_ROW_SIZE, bit_stream_num))
+        xbars_out = mvm_tensor(binary_input, input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, device)   
         output = xbars_out[:, :weight_channels_out]
  
         if bias is not None:
