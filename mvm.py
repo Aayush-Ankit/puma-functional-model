@@ -11,11 +11,13 @@ import time
  
 XBAR_COL_SIZE = 64
 XBAR_ROW_SIZE = 64
+pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_new_standard_sgd.pth.tar')
 
 class NN_model(nn.Module):
     def __init__(self):
          super(NN_model, self).__init__()
          self.fc1 = nn.Linear(4160, 10000)
+         self.bn1 = nn.BatchNorm1d(10000)
          self.relu1 = nn.ReLU(inplace=True)
          self.do2 = nn.Dropout(0.5)
          self.fc3 = nn.Linear(10000,64)
@@ -29,9 +31,8 @@ class NN_model(nn.Module):
         return out
 #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = NN_model()
-model.cuda()       
-
-
+model.cuda() 
+model.load_state_dict(pretrained_model['state_dict'])
 
 def get_tree_index(idx):    # version 2
 
@@ -193,64 +194,71 @@ def mvm_tensor(flatten_input, bias_addr, xbars, bit_slice, device, ind):   # ver
         inmin_V = 0
 
         output_analog = torch.zeros(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
-       # output_analog1 = torch.zeros(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
+        output_analog1 = torch.zeros(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
 
         for i in range(16):
             input_1bit = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
             Goffmat = Goff*torch.ones(batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1).to(device)
             V_real = input_1bit*Vmax/Nstates_stream
-            # V_real_scaled = [(V_real-inmin_V)/(inmax_V-inmin_V)]
+            V_real_scaled = [(V_real-inmin_V)/(inmax_V-inmin_V)]
             G_real = xbars*(Gon - Goff)/Nstates_slice +Goff
-            # G_real_scaled = [(G_real-Goff)/(Gon-Goff)]
-            output_bias_all = XBAR_ROW_SIZE*torch.mul(Goffmat,V_real)
+            G_real_scaled = [(G_real-Goff)/(Gon-Goff)]
+            output_bias_all = torch.sum(torch.mul(Goffmat,V_real),3).unsqueeze(3).expand(batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1)
             #for batch in range(batch_size):
             for xrow in range(xbars_row):
-                 for xcol in range(xbars_col):
-                     # ----- Put your own function here -----
-                        #input_t = input_1bit[:,xrow,0].t()
-                        #output_analog_xbar = input_t.mm(xbars[xrow, xcol]) #edit IC
-                        
-                        #----------------V, G Conversion Start--------------------
-                        #t1 = time.time()
-                        output_real = torch.mul(G_real[xrow,xcol], V_real[:, xrow, 0])
-                        output_real = torch.sum(output_real,2)
-                        #output_bias = torch.mul(Goffmat,V_real[:,xrow,0])
-                        output_bias = output_bias_all[:, xrow, 0].view(batch_size,XBAR_ROW_SIZE)
-                        output_analog_xbar_real = ((output_real-output_bias)*Comp_factor)
-                        #output_analog_xbar_real = torch.round(output_analog_xbar_real)
-                        #t2 = time.time()
-                        #print('Time taken for V-G', t2-t1)
+                for xcol in range(xbars_col):
+                    # ----- Put your own function here -----
+                    #input_t = input_1bit[:,xrow,0].t()
+                    #output_analog_xbar = input_t.mm(xbars[xrow, xcol]) #edit IC
+                    
+                    #----------------V, G Conversion Start--------------------
+                    #t1 = time.time()
+                    output_real = torch.mul(G_real[xrow,xcol], V_real[:, xrow, 0])
+                    output_real = torch.sum(output_real,1)
+                    #G_real_flatten = G_real[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_COL_SIZE)
+                    #pdb.set_trace()
+                    #G_real_flatten = G_real_flatten.unsqueeze(2).expand(batch_size, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1)
+                    #input_VG = torch.cat(V_real[:, xrow, 0], G_real_flatten)
+                    #output_niratio = model(input_VG)
+                    #output_bias = torch.mul(Goffmat,V_real[:,xrow,0])
+                    #pdb.set_trace()
+                    output_bias = output_bias_all[:, xrow, 0].view(batch_size,XBAR_ROW_SIZE)
+                    output_analog_xbar_real = ((output_real-output_bias)*Comp_factor)
+                    #output_analog_xbar_real = torch.round(output_analog_xbar_real)
+                    #t2 = time.time()
+                    #print('Time taken for V-G', t2-t1)
 
-                        #----------------V, G Conversion End--------------------
+                    #----------------V, G Conversion End--------------------
 
-                        #t1 = time.time()
+                    #t1 = time.time()
 
-                        #output_analog_xbar = torch.mul(xbars[xrow, xcol], input_1bit[:, xrow, 0])   # Product of each elements : [128 x 128]
-                        #output_analog_xbar = torch.sum(output_analog_xbar, 2)    # output of one xbar : array of 128 currents
-                        #pdb.set_trace()
-                        #t2 = time.time()
-                        #print('Time taken for normal', t2-t1)
-                        #input()
-                     # --------------------------------------
+                    # output_analog_xbar = torch.mul(xbars[xrow, xcol], input_1bit[:, xrow, 0])   # Product of each elements : [128 x 128]
+                    # output_analog_xbar = torch.sum(output_analog_xbar, 2)    # output of one xbar : array of 128 currents
+                    #pdb.set_trace()
+                    #t2 = time.time()
+                    #print('Time taken for normal', t2-t1)
+                    #input()
+                    # --------------------------------------
+                    pdb.set_trace()
+                    output_analog[:, xrow, xcol] = output_analog_xbar_real
 
-                        output_analog[:, xrow, xcol] = output_analog_xbar_real
 
 #---------------------------------------------------------With Batchsize Loop---------------------------------------------			
-      #      for batch in range(batch_size):
-      #          for xrow in range(xbars_row):
-      #              for xcol in range(xbars_col):
- 
-      #               # ----- Put your own function here -----
-      #                  #input_t = input_1bit[:,xrow,0].t()
-      #                  #output_analog_xbar = input_t.mm(xbars[xrow, xcol]) #edit IC
-      #                  #pdb.set_trace()
-      #                  output_analog_xbar1 = torch.mul(xbars[xrow, xcol], input_1bit[batch, xrow, 0])   # Product of each elements : [128 x 128]
-      #                  output_analog_xbar1 = torch.sum(output_analog_xbar1, 1)    # output of one xbar : array of 128 currents
-      #                  #pdb.set_trace()
-      #               # --------------------------------------
+                    # for batch in range(batch_size):
+                    #     for xrow in range(xbars_row):
+                    #         for xcol in range(xbars_col):
+             
+                    #         # ----- Put your own function here -----
+                    #            #input_t = input_1bit[:,xrow,0].t()
+                    #            #output_analog_xbar = input_t.mm(xbars[xrow, xcol]) #edit IC
+                    #            #pdb.set_trace()
+                    #            output_analog_xbar1 = torch.mul(xbars[xrow, xcol], input_1bit[batch, xrow, 0])   # Product of each elements : [128 x 128]
+                    #            output_analog_xbar1 = torch.sum(output_analog_xbar1, 1)    # output of one xbar : array of 128 currents
+                    #            #pdb.set_trace()
+                    #         # --------------------------------------
 
-      #                  output_analog1[batch, xrow, xcol] = output_analog_xbar1
-      #      pdb.set_trace()
+                    #            output_analog1[batch, xrow, xcol] = output_analog_xbar1
+                    
             output_analog_ = torch.round(output_analog)
             output_analog_=output_analog.reshape(shift_add_bit_slice.shape)
             output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog_, shift_add_bit_slice), 4)
