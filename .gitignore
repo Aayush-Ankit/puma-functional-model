@@ -7,3 +7,5 @@ models/*.tar
 *.tar
 Datasets/ 
 results/
+
+*.pyc
