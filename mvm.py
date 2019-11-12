@@ -4,7 +4,6 @@ import math
 import time
 import pdb
 
-# this file will be replaced
  
 XBAR_COL_SIZE = 64
 XBAR_ROW_SIZE = 64
@@ -220,7 +219,7 @@ def mvm_tensor(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slice, b
     return output
 
 
-def mvm_tensor_ind(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bit, acm_bit_frac, device):   # version 2
+def mvm_tensor_ind(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bit, acm_bit_frac, device):  #### These should be 'almost' completely changed. 
 
     # xbars shape:          [xbars_row, xbars_col, XBAR_ROW_SIZE, XBAR_COL_SIZE]
     # flatten_input shape:  [batch_size, xbars_row, XBAR_ROW_SIZE, 16]

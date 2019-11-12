@@ -21,7 +21,7 @@ class Conv2d_mvm_function(Function):
     # +--------------------------+
     # |            MVM           |   
     # +--------------------------+
-    def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=9, acm_bits=16, acm_bit_frac=-1, ind=False):
+    def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False):
        
         ## fixed-16: 
         ## sign     : 1 
@@ -33,8 +33,9 @@ class Conv2d_mvm_function(Function):
             input_bit_frac = input_bits//4*3
         if acm_bit_frac == -1:
             acm_bit_frac = acm_bits//4*3
+        if adc_bit == -1:
+            adc_bit = int(math.log2(XBAR_ROW_SIZE))+bit_slice
 
-        print(input_bit_frac)        
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         weight_channels_out = weight.shape[0]
@@ -214,7 +215,7 @@ class _ConvNd_mvm(nn.Module):
 class Conv2d_mvm(_ConvNd_mvm):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1,
-                 bias=True, padding_mode='zeros', check_grad=False, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=9, acm_bits=16, acm_bit_frac=-1, ind=False):
+                 bias=True, padding_mode='zeros', check_grad=False, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False):
         kernel_size = _pair(kernel_size)
         stride = _pair(stride)
         padding = _pair(padding)
@@ -234,18 +235,17 @@ class Linear_mvm_function(Function):
     # Note that both forward and backward are @staticmethods
     @staticmethod
     # bias is an optional argument
-    def forward(ctx, input, weight, bias=None, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=9, acm_bits=16, acm_bit_frac=-1, ind=False):
+    def forward(ctx, input, weight, bias=None, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False):
 
-        ## fixed-16: 
-        ## sign     : 1 
-        ## integer  : 3
-        ## fraction : 12
         if weight_bit_frac == -1:
             weight_bit_frac = weight_bits//4*3
         if input_bit_frac == -1:
             input_bit_frac = input_bits//4*3
         if acm_bit_frac == -1:
-            acm_bit_frac = acm_bits//4*3       
+            acm_bit_frac = acm_bits//4*3      
+        if adc_bit == -1:
+            adc_bit = int(math.log2(XBAR_ROW_SIZE))+bit_slice
+ 
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         weight_channels_out = weight.shape[0]
@@ -318,7 +318,7 @@ class Linear_mvm_function(Function):
         return grad_input, grad_weight, grad_bias
 
 class Linear_mvm(nn.Module):
-    def __init__(self, input_features, output_features, bias=True, bit_slice = 2, bit_stream = 1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=9, acm_bits=16, acm_bit_frac=-1, ind = False):
+    def __init__(self, input_features, output_features, bias=True, bit_slice = 2, bit_stream = 1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind = False):
         super(Linear_mvm, self).__init__()
         self.input_features = input_features
         self.output_features = output_features

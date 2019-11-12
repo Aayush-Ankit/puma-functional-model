@@ -44,15 +44,15 @@ class Net(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = x.view(x.size(0), -1)
-        x = self.linear(x)
+#        x = x.view(x.size(0), -1)
+#        x = self.linear(x)
         return x
 
 
 class my_Net(nn.Module):
     def __init__(self):
         super(my_Net, self).__init__()
-        self.conv1 = Conv2d_mvm(16,32,3, bit_slice = 2, bit_stream = 2, bias=False, input_bits=32, input_bit_frac=20, weight_bits=32, acm_bits=32, acm_bit_frac=20,  ind=ind)   # --> my custom module for mvm
+        self.conv1 = Conv2d_mvm(16,32,3, bit_slice = 2, bit_stream = 2, bias=False, input_bits=16, input_bit_frac=12, weight_bits=16, acm_bits=32, acm_bit_frac=20,  ind=ind)   # --> my custom module for mvm
         self.conv1.weight.data = torch.clone(weights)
 
         self.linear = Linear_mvm(288,10, bit_slice = 4, bit_stream = 2, bias=False, input_bits=32, weight_bits=32, acm_bits=32, ind=ind)
@@ -60,8 +60,8 @@ class my_Net(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = x.view(x.size(0),-1)
-        x = self.linear(x)
+#        x = x.view(x.size(0),-1)
+#        x = self.linear(x)
         return x
 
 
