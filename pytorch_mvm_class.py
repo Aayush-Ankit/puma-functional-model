@@ -48,7 +48,10 @@ class Conv2d_mvm_function(Function):
         weight_xbar[:flatten_bit_slice_weight.shape[0], :flatten_bit_slice_weight.shape[1]] = flatten_bit_slice_weight
         xbars = torch.zeros((xbar_row, xbar_col, XBAR_ROW_SIZE, XBAR_COL_SIZE)).to(device)
 
-        bit_slice_num = int(16/bit_slice)
+        bit_slice_num = 16//bit_slice
+        bit_stream_num = 16//bit_stream
+
+
         bias_addr = [weight_channels_out//int(XBAR_COL_SIZE/bit_slice_num), weight_channels_out%int(XBAR_COL_SIZE/bit_slice_num)]      #####
         for i in range(xbar_row):
             for j in range(xbar_col):
@@ -60,19 +63,31 @@ class Conv2d_mvm_function(Function):
         input_col = input.shape[3] + padding[1]*2
         input_pad = torch.zeros((input_batch, input_channels, input_row, input_col)).to(device)
         input_pad[:,:,padding[0]:input_row-padding[0],padding[1]:input_col-padding[1]] = input
+        pos = torch.ones(input_batch, input_channels, weight_row, weight_col).reshape(input_batch,-1).to(device)
+        neg = pos.clone().fill_(0)
         
         output_row = input_row - weight_row + 1
         output_col = input_col - weight_col + 1 
         output = torch.zeros((input_batch, weight_channels_out, output_row, output_col)).to(device)
-        flatten_binary_input = torch.zeros(input_batch, xbars.shape[0]*XBAR_ROW_SIZE, 16).to(device)
+        flatten_binary_input = torch.zeros(input_batch, xbars.shape[0]*XBAR_ROW_SIZE, bit_stream_num).to(device)
+        flatten_input_sign_temp = torch.zeros(input_batch, xbars.shape[0]*XBAR_ROW_SIZE, bit_stream_num).to(device)
+        flatten_input_sign_xbar= torch.zeros(input_batch, xbars.shape[0],XBAR_ROW_SIZE, bit_stream_num).to(device)
 
         for i in range(output_row):
             for j in range(output_col):
                 input_temp = input_pad[:,:, i:i+weight_row, j:j+weight_col].reshape(input_batch,-1)    ## one set of inputs --> flatten: n x 1
-                flatten_binary_input_temp = float_to_16bits_tensor(input_temp, frac_bit, device)   # batch x n x 16
+                if bit_stream > 1:
+                    flatten_input_sign = torch.where(input_temp > 0, pos, neg).expand(bit_stream_num,-1,-1).permute(1,2,0)
+                    flatten_input_sign_temp[:,:flatten_input_sign.shape[1]] = flatten_input_sign
+                    flatten_input_sign_xbar = flatten_input_sign_temp.reshape(input_batch, xbars.shape[0],XBAR_ROW_SIZE, bit_stream_num)
+                    input_temp.abs_()
+                flatten_binary_input_temp = float_to_16bits_tensor(input_temp, frac_bit, bit_stream, device)   # batch x n x 16
                 flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
-                flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch, xbars.shape[0],XBAR_ROW_SIZE, 16))
-                xbars_out = mvm_tensor(flatten_binary_input_xbar, bias_addr, xbars, bit_slice, device, ind)   
+                flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch, xbars.shape[0],XBAR_ROW_SIZE, bit_stream_num))
+                if ind == True:
+                    xbars_out = mvm_tensor_ind(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, device)   
+                else:
+                    xbars_out = mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, device)   
                 output[:,:,i,j] += xbars_out[:, :weight_channels_out]
 
 
@@ -239,7 +254,9 @@ class Linear_mvm_function(Function):
        
         binary_input = torch.zeros(input_batch, xbars.shape[0]*XBAR_ROW_SIZE, 16).to(device)
 
-        binary_input[:,:input.shape[1]] = float_to_16bits_tensor(input, frac_bit, device)   # batch x n x 16
+        pos = torch.ones(input.shape)
+
+        binary_input[:,:input.shape[1]] = float_to_16bits_tensor(input, frac_bit, bit_stream, device)   # batch x n x 16
 
         binary_input = binary_input.reshape((input_batch, xbars.shape[0], XBAR_ROW_SIZE, 16))
         xbars_out = mvm_tensor(binary_input, bias_addr, xbars, bit_slice, device, ind)   

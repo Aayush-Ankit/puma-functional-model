@@ -23,8 +23,8 @@ trainloader = [[inputs, labels]]
 #trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
 #trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
 
-inputs = torch.rand(2,16,5,5).mul_(2).sub_(1)
-weights = torch.rand(32,16,3,3).sub_(0.5)
+inputs = torch.rand(2,16,5,5).sub(0.5).div(10)
+weights = torch.rand(32,16,3,3).sub(0.5).div(10)
 
 weights_lin = torch.rand(10,288).sub_(0.5).mul_(0.5)
 
@@ -44,15 +44,15 @@ class Net(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = x.view(x.size(0), -1)
-        x = self.linear(x)
+#        x = x.view(x.size(0), -1)
+#        x = self.linear(x)
         return x
 
 
 class my_Net(nn.Module):
     def __init__(self):
         super(my_Net, self).__init__()
-        self.conv1 = Conv2d_mvm(16,32,3, bit_slice = 4, bit_stream = 1, bias=False, ind=ind)   # --> my custom module for mvm
+        self.conv1 = Conv2d_mvm(16,32,3, bit_slice = 4, bit_stream = 2, bias=False, ind=ind)   # --> my custom module for mvm
         self.conv1.weight.data = torch.clone(weights)
 
         self.linear = Linear_mvm(288,10, bit_slice = 4, bit_stream = 1, bias=False, ind=ind)
@@ -60,8 +60,8 @@ class my_Net(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = x.view(x.size(0),-1)
-        x = self.linear(x)
+#        x = x.view(x.size(0),-1)
+#        x = self.linear(x)
         return x
 
 
@@ -75,9 +75,9 @@ mynet.to(device)
 inputs = inputs.to(device)
 
 result_net = net(inputs)
-print(result_net)#[0,:2])
+print(result_net[0,:2])
 
 result_mynet = mynet(inputs)
-print(result_mynet)#[0,:2])
+print(result_mynet[0,:2])
 print(torch.norm(result_net-result_mynet))
 
