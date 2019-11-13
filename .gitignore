@@ -2,3 +2,10 @@
 __pycache__
 data/
 backup*
+
+models/*.tar
+*.tar
+Datasets/ 
+results/
+
+*.pyc

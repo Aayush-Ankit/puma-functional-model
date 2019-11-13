@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.autograd import Function
 from torch.nn.modules.utils import _pair
 from torch.nn import init
-
+import pdb
 import math
 import numpy as np
 from mvm import *
@@ -60,7 +60,6 @@ class Conv2d_mvm_function(Function):
         bit_slice_num = weight_bits//bit_slice
         bit_stream_num = input_bits//bit_stream
 
-
         bias_addr = [weight_channels_out//int(XBAR_COL_SIZE/bit_slice_num), weight_channels_out%int(XBAR_COL_SIZE/bit_slice_num)]      #####
         for i in range(xbar_row):
             for j in range(xbar_col):
@@ -90,6 +89,7 @@ class Conv2d_mvm_function(Function):
                     flatten_input_sign_temp[:,:flatten_input_sign.shape[1]] = flatten_input_sign
                     flatten_input_sign_xbar = flatten_input_sign_temp.reshape(input_batch, xbars.shape[0],XBAR_ROW_SIZE, bit_stream_num)
                     input_temp.abs_()
+
                 flatten_binary_input_temp = float_to_16bits_tensor(input_temp, input_bit_frac, bit_stream, input_bits, device)   # batch x n x 16
 #                print(flatten_binary_input_temp)
                 flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
@@ -97,7 +97,7 @@ class Conv2d_mvm_function(Function):
                 if ind == True:
                     xbars_out = mvm_tensor_ind(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)   
                 else:
-                    xbars_out = mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)   
+                    xbars_out = mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
                 output[:,:,i,j] += xbars_out[:, :weight_channels_out]
 
 
@@ -293,6 +293,7 @@ class Linear_mvm_function(Function):
             xbars_out = mvm_tensor_ind(binary_input, input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
         else:
             xbars_out = mvm_tensor(binary_input, input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
+
         output = xbars_out[:, :weight_channels_out]
  
         if bias is not None:

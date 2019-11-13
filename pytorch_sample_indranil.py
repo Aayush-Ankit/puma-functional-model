@@ -10,336 +10,307 @@ import models
 from pytorch_mvm_class import *
 import os
 import argparse
-os.environ['CUDA_VISIBLE_DEVICES']='3'
+from data import get_dataset
+from preprocess import get_transform
+from utils import *
+from torchvision.utils import save_image
 
+os.environ['CUDA_VISIBLE_DEVICES']='1'
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
                      and callable(models.__dict__[name]))
+
+def accuracy(output, target, training, topk=(1,)):
+    """Computes the precision@k for the specified values of k"""
+    maxk = max(topk)
+    batch_size = target.size(0)
+
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+    if training:
+        correct = pred.eq(target.data.view(1, -1).expand_as(pred))
+    else:
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+    res = []
+    for k in topk:
+        correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+        res.append(correct_k.mul_(100.0 / batch_size))
+    return res
+
+def test():
+    global best_acc
+    flag = True
+    training = False
+    model.eval()
+    losses = AverageMeter()
+    top1 = AverageMeter()
+    top5 = AverageMeter()
+
+
+    for batch_idx,(data, target) in enumerate(testloader):
+        target = target.cuda()
+        data_var = torch.autograd.Variable(data.cuda(), volatile=True)
+        target_var = torch.autograd.Variable(target, volatile=True)
+
+                                    
+        output = model(data_var)
+        loss= criterion(output, target_var)
+        prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
+        losses.update(loss.data, data.size(0))
+        top1.update(prec1[0], data.size(0))
+        top5.update(prec5[0], data.size(0))
+
+
+        if flag == True:
+            if batch_idx % 1 == 0:
+                print('[{0}/{1}({2:.0f}%)]\t'
+                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                       batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
+                       loss=losses, top1=top1, top5=top5))
+        else:
+            if batch_idx % 1 == 0:
+               print('Epoch: [{0}][{1}/{2}({3:.0f}%)]\t'
+                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                       epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
+                       loss=losses, top1=top1, top5=top5))
+        if batch_idx == 9:
+            break
+
+
+    acc = top1.avg
+    # if acc > best_acc:
+    #     best_acc = acc
+    #     save_state(model, best_acc)
+    
+
+    print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
+          .format(top1=top1, top5=top5))
+
+    # print('Best Accuracy: {:.2f}%\n'.format(best_acc))
+    return acc, losses.avg
+
+def test_mvm():
+    global best_acc
+    flag = True
+    training = False
+    model_mvm.eval()
+    losses = AverageMeter()
+    top1 = AverageMeter()
+    top5 = AverageMeter()
+
+    for batch_idx,(data, target) in enumerate(testloader):
+        target = target.cuda()
+        data_var = torch.autograd.Variable(data.cuda(), volatile=True)
+        target_var = torch.autograd.Variable(target, volatile=True)
+
+                                    
+        output = model_mvm(data_var)
+        loss= criterion(output, target_var)
+
+        prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
+        losses.update(loss.data, data.size(0))
+        top1.update(prec1[0], data.size(0))
+        top5.update(prec5[0], data.size(0))
+        if flag == True:
+            if batch_idx % 1 == 0:
+                print('[{0}/{1}({2:.0f}%)]\t'
+                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                       batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
+                       loss=losses, top1=top1, top5=top5))
+        else:
+            if batch_idx % 1 == 0:
+               print('Epoch: [{0}][{1}/{2}({3:.0f}%)]\t'
+                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                       epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
+                       loss=losses, top1=top1, top5=top5))
+        if batch_idx == 9:
+            break
+
+    acc = top1.avg
+    # if acc > best_acc:
+    #     best_acc = acc
+    #     save_state(model, best_acc)
+    
+
+    print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
+          .format(top1=top1, top5=top5))
+
+    # print('Best Accuracy: {:.2f}%\n'.format(best_acc))
+    return acc, losses.avg
+
+
 
 ## To Indranil & Mustafa: This is for using 'for loops' in mvm_tensor. Just execute with '-i' at command line
 # ind = False
 # for i in range(len(sys.argv)):
 #     if sys.argv[i] == '-i':
 #         ind = True
+if __name__=='__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-b', '--batch-size', default=100, type=int,
+                         metavar='N', help='mini-batch size (default: 256)')
+    parser.add_argument('-i', default=False,
+                         metavar='N', help='turn on Ind feature')
+    parser.add_argument('--dataset', metavar='DATASET', default='cifar100',
+                help='dataset name or folder')
+    parser.add_argument('--arch', action='store', default='resnet20',
+        help='the architecture for the network: resnet')
+    parser.add_argument('--model', '-a', metavar='MODEL', default='resnet20',
+                choices=model_names,
+                help='model architecture: ' +
+                ' | '.join(model_names) +
+                ' (default: resnet)')
+    parser.add_argument('--pretrained', action='store', default=None,
+        help='the path to the pretrained model')
+    parser.add_argument('--evaluate', action='store_true',
+        help='evaluate the model')
+    parser.add_argument('--input_size', type=int, default=None,
+                help='image input size')
+    parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
+                help='number of data loading workers (default: 8)')
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-b', '--batch-size', default=100, type=int,
-                     metavar='N', help='mini-batch size (default: 256)')
-parser.add_argument('-i', default=False,
-                     metavar='N', help='turn on Ind feature')
-parser.add_argument('--arch', action='store', default='vgg',
-            help='the architecture for the network: resnet')
-parser.add_argument('--model', '-a', metavar='MODEL', default='vgg',
-                    choices=model_names,
-                    help='model architecture: ' +
-                    ' | '.join(model_names) +
-                    ' (default: resnet)')
-args = parser.parse_args()
-if args.i == 'True':
-    ind = True
-else:
-    ind = False
-#
-
-inputs = torch.tensor([[[[-1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]], [[[1.,0,1],[-2,1,0],[1,-2,1]],[[2,-3,1],[-2,0,-1],[4,-2,-1]],[[-3,2,1],[0,2,1],[-5,3,2]]]])/10
-#inputs = torch.tensor([[[[1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]], [[[-1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]]])
-
-labels = torch.tensor([1, 1])
-weights = torch.tensor([[[[-2.,1],[-1,2]],[[-4,2],[0,1]],[[-1,0],[-3,-2]]],[[[2.,1],[1,2]],[[3,2],[1,1]],[[1,2],[3,2]]]])/10
-trainloader = [[inputs, labels]]
-trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=4)
-inputs, labels = next(iter(trainloader))
-#inputs = torch.rand(2,32,5,5).mul_(2).sub_(1)
-#weights_conv1 = torch.rand(64,3,3,3).sub_(0.5)
-#weights_conv2 = torch.rand(64,64,3,3).sub_(0.5)
-#
-#weights_conv3 = torch.rand(64,64,3,3).sub_(0.5)
-#weights_conv4 = torch.rand(64,64,3,3).sub_(0.5)
-#
-#weights_conv5 = torch.rand(256,128,3,3).sub_(0.5)
-#weights_conv6 = torch.rand(256,256,3,3).sub_(0.5)
-#
-#weights_conv7 = torch.rand(512,256,3,3).sub_(0.5)
-#weights_conv6= torch.rand(512,512,3,3).sub_(0.5)
-#
-#weights_conv9 = torch.rand(512,512,3,3).sub_(0.5)
-#weights_conv10 = torch.rand(512,512,3,3).sub_(0.5)
-#
-#weights_lin = torch.rand(10,512).sub_(0.5).mul_(0.5)
-
-print('==> building model',args.arch,'...')
-if args.arch == 'vgg':
-    #print(models.__dict__)
-    model = models.__dict__[args.model]
-    #model_config = {'input_size': args.input_size, 'dataset': args.dataset}
-    print(model)
-else:
-    raise Exception(args.arch+' is currently not supported')
+    args = parser.parse_args()
+    if args.i == 'True':
+        ind = True
+    else:
+        ind = False
+    #
 
 
-model = model()
-model_mvm = models.__dict__['vgg_mvm']
-model_mvm = model_mvm(ind)
-#pdb.set_trace()
 
-print('==> Initializing model parameters ...')
-weights_conv = []
-for m in model.modules():
+    print('==> building model',args.arch,'...')
+    if args.arch == 'vgg' or 'resnet20':
+        #print(models.__dict__)
+        model = models.__dict__[args.model]
+        #model_config = {'input_size': args.input_size, 'dataset': args.dataset}
+        print(model)
+    else:
+        raise Exception(args.arch+' is currently not supported')
+
+
+    model = model()
+    model_mvm = models.__dict__['resnet20_mvm']
+    model_mvm = model_mvm(ind)
+    #pdb.set_trace()
+
+    print('==> Initializing model parameters ...')
+    weights_conv = []
+    weights_lin = []
+    bn_data = []
+    bn_bias = []
+    running_mean = []
+    running_var = []
+    num_batches = []
+
+    if not args.pretrained:
+        for m in model.modules():
+            
+          #  print (m)for m in model.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+                weights_conv.append(m.weight.data.clone())
+            #print(m.weight.data)
+            #raw_input()
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+            elif isinstance(m, nn.Linear):
+                    stdv = 1. / math.sqrt(m.weight.data.size(1))
+                    m.weight.data.uniform_(-stdv, stdv)
+                    weights_lin.append(m.weight.data.clone())
+                    if m.bias is not None:
+                       m.bias.data.uniform_(-stdv, stdv)
+    else:
+        print('==> Load pretrained model form', args.pretrained, '...')
+        pretrained_model = torch.load(args.pretrained)
+        best_acc = pretrained_model['best_acc']
+        model.load_state_dict(pretrained_model['state_dict'])
+        for m in model.modules():
+            if isinstance(m, nn.Conv2d):
+                weights_conv.append(m.weight.data.clone())
+                #print(m.weight.data)
+                #raw_input()
+            elif isinstance(m, nn.BatchNorm2d):
+                bn_data.append(m.weight.data.clone())
+                bn_bias.append(m.bias.data.clone())
+                running_mean.append(m.running_mean.data.clone())
+                running_var.append(m.running_var.data.clone())
+                num_batches.append(m.num_batches_tracked.clone())
+            elif isinstance(m, nn.Linear):
+                weights_lin.append(m.weight.data.clone())
+
+    i=0
+    j=0
+    k=0
+    for m in model_mvm.modules():
+        
+      #  print (m)for m in model.modules():
+        if isinstance(m, Conv2d_mvm):
+            m.weight.data = weights_conv[i]
+            i = i+1
+        #print(m.weight.data)
+        #raw_input()
+        elif isinstance(m, nn.BatchNorm2d):
+            m.weight.data = bn_data[j]
+            m.bias.data = bn_bias[j]
+            m.running_mean.data = running_mean[j]
+            m.running_var.data = running_var[j]
+            m.num_batches_tracked = num_batches[j]
+            j = j+1
+        elif isinstance(m, nn.Linear):
+            #pdb.set_trace()
+            m.weight.data = weights_lin[k]
+            k=k+1
+    model.cuda()
+    model_mvm.cuda()
     
-  #  print (m)for m in model.modules():
-    if isinstance(m, nn.Conv2d):
-        n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-        m.weight.data.normal_(0, math.sqrt(2. / n))
-        weights_conv.append(m.weight.data.clone())
-    #print(m.weight.data)
-    #raw_input()
-    elif isinstance(m, nn.BatchNorm2d):
-        m.weight.data.fill_(1)
-        m.bias.data.zero_()
-    elif isinstance(m, nn.Linear):
-            stdv = 1. / math.sqrt(m.weight.data.size(1))
-            m.weight.data.uniform_(-stdv, stdv)
-            weights_lin = m.weight.data.clone()
-            if m.bias is not None:
-               m.bias.data.uniform_(-stdv, stdv)
 
-i=0
-for m in model_mvm.modules():
-    
-  #  print (m)for m in model.modules():
-    if isinstance(m, nn.Conv2d):
-        m.weight.data = weights_conv[i]
-        i = i+1
-    #print(m.weight.data)
-    #raw_input()
-    elif isinstance(m, nn.BatchNorm2d):
-        m.weight.data.fill_(1)
-        m.bias.data.zero_()
-    elif isinstance(m, nn.Linear):
-            m.weight.data = weights_lin
-model.cuda()
-model_mvm.cuda()
+    default_transform = {
+        'train': get_transform(args.dataset,
+                               input_size=args.input_size, augment=True),
+        'eval': get_transform(args.dataset,
+                              input_size=args.input_size, augment=False)
+    }
+    transform = getattr(model, 'input_transform', default_transform)
+    train_data = get_dataset(args.dataset, 'train', transform['train'])
+    trainloader = torch.utils.data.DataLoader(
+        train_data,
+        batch_size=args.batch_size, shuffle=True,
+        num_workers=args.workers, pin_memory=True)
 
-#pdb.set_trace()
-# weights_conv1 = torch.rand(64,3,3,3).sub_(0.5)
+    test_data = get_dataset(args.dataset, 'val', transform['eval'])
+    testloader = torch.utils.data.DataLoader(
+        test_data,
+        batch_size=args.batch_size, shuffle=False,
+        num_workers=args.workers, pin_memory=True)
 
-# weights_conv2 = torch.rand(64,64,3,3).sub_(0.5)
-# weights_conv3 = torch.rand(64,64,3,3).sub_(0.5)
-# weights_conv4 = torch.rand(64,64,3,3).sub_(0.5)
-# weights_conv5 = torch.rand(64,64,3,3).sub_(0.5)
+    classes = (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100)
+    criterion = nn.CrossEntropyLoss()
 
+    if args.evaluate:
+        test()
+        test_mvm()
+        exit(0)
 
-# weights_conv6 = torch.rand(128,64,3,3).sub_(0.5)
-# weights_conv7 = torch.rand(128,128,3,3).sub_(0.5)
-# weights_conv8 = torch.rand(128,128,3,3).sub_(0.5)
-# weights_conv9 = torch.rand(128,128,3,3).sub_(0.5)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    #net.to(device)
+    # mynet.to(device)
+    # inputs = inputs.to(device)
 
+    # result_net = model(inputs)
+    # print(result_net[0][0])#[0,:2])
 
-
-# weights_conv10 = torch.rand(256,128,3,3).sub_(0.5)
-# weights_conv11 = torch.rand(256,256,3,3).sub_(0.5)
-# weights_conv12 = torch.rand(256,256,3,3).sub_(0.5)
-# weights_conv13 = torch.rand(256,256,3,3).sub_(0.5)
-
-
-# weights_lin = torch.rand(10,256).sub_(0.5).mul_(0.5)
-
-
-#inputs_lin = torch.tensor([[-1.,0,1,2,-2],[5, 4, 3, 2, 1]])/10
-#weights_lin = torch.tensor([[-1.,0,1,2,-2],[5, 4, 3, 2, 1],[-1, -2, -3, -4, -5]])/10
-
-
-# class my_Net(nn.Module):
-#     def __init__(self):
-#         super(my_Net, self).__init__()
-        
-#         self.conv1 = Conv2d_mvm(3,64,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv1.weight.data = torch.clone(weights_conv[0])
-    
-#         self.bn1 = nn.BatchNorm2d(64)
-#         self.bn1.bias.data.zero_()
-#         self.bn1.weight.data.fill_(1)
-
-
-#         self.conv2 = Conv2d_mvm(64,64,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv2.weight.data = torch.clone(weights_conv[1])
-#         self.maxpool1 = nn.MaxPool2d(2,2)
-
-#         self.bn2 = nn.BatchNorm2d(64)
-#         self.bn2.bias.data.zero_() 
-#         self.bn2.weight.data.fill_(1)
-
-
-#         self.conv3 = Conv2d_mvm(64,64,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv3.weight.data = torch.clone(weights_conv[2])
-
-#         self.bn3 = nn.BatchNorm2d(64)
-#         self.bn3.bias.data.zero_() 
-#         self.bn3.weight.data.fill_(1)
-
-
-#         self.conv4 = Conv2d_mvm(64,64,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv4.weight.data = torch.clone(weights_conv[3])
-
-#         self.bn4 = nn.BatchNorm2d(64)
-#         self.bn4.bias.data.zero_() 
-#         self.bn4.weight.data.fill_(1)
-
-#         self.maxpool2 = nn.MaxPool2d(2,2)
-
-#         self.conv5 = Conv2d_mvm(64,64,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv5.weight.data = torch.clone(weights_conv[4])
-
-#         self.bn5 = nn.BatchNorm2d(128)
-#         self.bn5.bias.data.zero_() 
-#         self.bn5.weight.data.fill_(1)
-
-
-#         self.conv6= Conv2d_mvm(64,128,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv6.weight.data = torch.clone(weights_conv[5])
-
-#         self.bn6= nn.BatchNorm2d(128)
-#         self.bn6.bias.data.zero_() 
-#         self.bn6.weight.data.fill_(1)
-
-
-#         self.conv7 = Conv2d_mvm(128,128,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv7.weight.data = torch.clone(weights_conv[6])
-        
-#         self.bn7 = nn.BatchNorm2d(128)
-#         self.bn7.bias.data.zero_() 
-#         self.bn7.weight.data.fill_(1)
-        
-#         self.maxpool3 = nn.MaxPool2d(2,2)
-        
-        
-#         self.conv8 = Conv2d_mvm(128,128,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv8.weight.data = torch.clone(weights_conv[7])
-        
-#         self.bn8 = nn.BatchNorm2d(128)
-#         self.bn8.bias.data.zero_() 
-#         self.bn8.weight.data.fill_(1)
-        
-#         self.conv9 = Conv2d_mvm(128,128,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv9.weight.data = torch.clone(weights_conv[8])
-        
-#         self.bn9 = nn.BatchNorm2d(128)
-#         self.bn9.bias.data.zero_() 
-#         self.bn9.weight.data.fill_(1)
-        
-#         self.maxpool4 = nn.MaxPool2d(2,2)
-        
-#         self.conv10 = Conv2d_mvm(128,256,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv10.weight.data = torch.clone(weights_conv[9])
-        
-#         self.bn10 = nn.BatchNorm2d(256)
-#         self.bn10.bias.data.zero_() 
-#         self.bn10.weight.data.fill_(1)
-
-#         self.conv11 = Conv2d_mvm(256,256,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv11.weight.data = torch.clone(weights_conv[10])
-        
-#         self.bn11 = nn.BatchNorm2d(256)
-#         self.bn11.bias.data.zero_() 
-#         self.bn11.weight.data.fill_(1)
-
-#         self.conv12 = Conv2d_mvm(256,256,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv12.weight.data = torch.clone(weights_conv[11])
-        
-#         self.bn12 = nn.BatchNorm2d(256)
-#         self.bn12.bias.data.zero_() 
-#         self.bn12.weight.data.fill_(1)
-
-#         self.conv13 = Conv2d_mvm(256,256,3, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.conv13.weight.data = torch.clone(weights_conv[12])
-        
-#         self.bn13 = nn.BatchNorm2d(256)
-#         self.bn13.bias.data.zero_() 
-#         self.bn13.weight.data.fill_(1)
-
-#         self.maxpool5 = nn.MaxPool2d(2,2)
-        
-        
-#         self.avgpool = nn.AvgPool2d(6)
-        
-#         self.linear = Linear_mvm(256,10, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
-#         self.linear.weight.data = torch.clone(weights_lin)
-
-#     def forward(self, x):
-#         t = time.time()
-#         x = self.conv1(x)
-#         x = F.relu(x)
-#         x = self.bn1(x)
-#         x = self.conv2(x)
-#         x = F.relu(x)
-#         x = self.bn2(x)
-#         #x = self.maxpool1(x)
-        
-#         x = self.conv3(x)
-#         x = F.relu(x)
-#         x = self.bn3(x)
-#         x = self.conv4(x)
-#         x = F.relu(x)
-#         x = self.bn4(x)
-#         #x = self.maxpool2(x)
-
-#         x = self.conv5(x)
-#         x = F.relu(x)
-#         x = self.bn5(x)
-#         x = self.conv6(x)
-#         x = F.relu(x)
-#         x = self.bn6(x)
-#         #x = self.maxpool3(x)
-        
-#         x = self.conv7(x)
-#         x = F.relu(x)
-#         x = self.bn7(x)
-#         x = self.conv8(x)
-#         x = F.relu(x)
-#         x = self.bn8(x)
-#         #x = self.maxpool4(x)
-        
-        
-#         x = self.conv9(x)
-#         x = F.relu(x)
-#         x = self.bn9(x)
-#         x = self.conv10(x)
-#         x = F.relu(x)
-#         x = self.bn10(x)
-#         #x = self.maxpool5(x)
-        
-#         x = self.conv11(x)
-#         x = F.relu(x)
-#         x = self.bn11(x)
-#         x = self.conv12(x)
-#         x = F.relu(x)
-#         x = self.bn12(x)
-#         x = self.conv13(x)
-#         x = F.relu(x)
-#         x = self.bn13(x)
-#         #x = self.maxpool5(x)
-#         x = self.avgpool(x)
-#         x = x.view(x.size(0),-1)
-#         x = self.linear(x)
-#         t1 = time.time()
-#         print('Time taken: ',t1-t)
-#         return x
-
-
-#net = Net()
-# mynet = my_Net()
-
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-#net.to(device)
-# mynet.to(device)
-inputs = inputs.to(device)
-
-result_net = model(inputs)
-print(result_net[0][0])#[0,:2])
-
-result_mynet = model_mvm(inputs)
-print(result_mynet[0][0])#[0,:2])
+    # result_mynet = model_mvm(inputs)
+    # print(result_mynet[0][0])#[0,:2])
 #print(torch.norm(result_net-result_mynet))
 

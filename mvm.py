@@ -1,13 +1,40 @@
 import numpy as np
 import torch
 import math
-import time
 import pdb
+import torch.nn as nn
+import torch.nn.functional as F
+import sys
+import time
+import os
+import argparse
+os.environ['CUDA_VISIBLE_DEVICES']='1'
 
  
 XBAR_COL_SIZE = 64
 XBAR_ROW_SIZE = 64
+#pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_new_standard_sgd.pth.tar')
 
+# class NN_model(nn.Module):
+#     def __init__(self):
+#          super(NN_model, self).__init__()
+#          self.fc1 = nn.Linear(4160, 10000)
+#          self.bn1 = nn.BatchNorm1d(10000)
+#          self.relu1 = nn.ReLU(inplace=True)
+#          self.do2 = nn.Dropout(0.5)
+#          self.fc3 = nn.Linear(10000,64)
+#     def forward(self, x):
+#         x = x.view(x.size(0), -1)
+#         #pdb.set_trace()
+#         out = self.fc1(x)
+#         out = self.relu1(out)
+#         out = self.do2(out)
+#         out = self.fc3(out)
+#         return out
+# #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# model = NN_model()
+# model.cuda() 
+# model.load_state_dict(pretrained_model['state_dict'])
 
 def get_tree_index(idx):    # version 2
 
@@ -97,6 +124,7 @@ def bit_slicing(weight, frac_bit, bit_slice, weight_bits, device):  # version 2
     return bitslice
 
 def float_to_16bits_tensor(input, frac_bit, bit_stream, input_bits, device): # input is batch x n tensor / output is n x 16 tensor.. version 2
+
     #assume positive
     # input.shape[0] = batch size
     # input.shape[1] = flattened input length
@@ -146,12 +174,10 @@ def mvm_tensor(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slice, b
     bit_slice_num = weight_bits//bit_slice
     bit_stream_num = input_bits//bit_stream
 
-
     zeros = torch.zeros(flatten_input.shape).to(device)
     input_pos = torch.where(flatten_input_sign == 1, flatten_input, zeros)
     input_neg = flatten_input.sub(input_pos)
     input_split = torch.stack([input_pos, input_neg])
-
 
     shift_add_bit_stream = torch.zeros(bit_stream_num, dtype=torch.double) # input bits = 16
     for i in range(bit_stream_num):
@@ -224,6 +250,16 @@ def mvm_tensor_ind(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slic
     # xbars shape:          [xbars_row, xbars_col, XBAR_ROW_SIZE, XBAR_COL_SIZE]
     # flatten_input shape:  [batch_size, xbars_row, XBAR_ROW_SIZE, 16]
     # 2-bit bit-slicing
+    Gon = 1/100
+    Goff = 1/600
+    Nstates_slice = 15
+    Nstates_stream = 1
+    Vmax = 0.25
+    Goffmat = Goff*torch.ones(XBAR_ROW_SIZE,XBAR_COL_SIZE).to(device)
+    Comp_factor = Nstates_slice*Nstates_stream/((Gon-Goff)*Vmax)
+    inmax_V = Vmax
+    inmin_V = 0
+
     xbars_row = xbars.shape[0]
     xbars_col = xbars.shape[1]
     batch_size = flatten_input.shape[0]
@@ -234,89 +270,159 @@ def mvm_tensor_ind(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slic
     zeros = torch.zeros(flatten_input.shape).to(device)
     input_pos = torch.where(flatten_input_sign == 1, flatten_input, zeros)
     input_neg = flatten_input.sub(input_pos)
+    input_split = torch.stack([input_pos, input_neg])
 
-    shift_add_1bit = torch.zeros(bit_stream_num) # input bits = 16
+    shift_add_bit_stream = torch.zeros(bit_stream_num) # input bits = 16
     for i in range(bit_stream_num):
-        shift_add_1bit[i] = 2**(bit_stream*i)
-    if bit_stream == 1:
-        shift_add_1bit[-1] *= -1        # last bit --> subtract
-    shift_add_1bit = shift_add_1bit.expand((batch_size, xbars_row, xbars_col, int(XBAR_COL_SIZE/bit_slice_num), bit_stream_num)).transpose(3,4).to(device)
-   
+        shift_add_bit_stream[i] = 2**(bit_stream*i)
+
     shift_add_bit_slice = torch.zeros(bit_slice_num) # 16bit / 2bit-slice
     for i in range(bit_slice_num):
         shift_add_bit_slice[-i-1] = 2**(bit_slice*i)
-    shift_add_bit_slice = shift_add_bit_slice.expand((batch_size, xbars_row, xbars_col, int(XBAR_COL_SIZE/bit_slice_num), bit_slice_num)).to(device)
     
-    output_reg = torch.zeros(batch_size, xbars_row, xbars_col, bit_stream_num, int(XBAR_COL_SIZE/bit_slice_num)).to(device)
-# ---------------------------------------------------------- For Indranil & Mustafa -------------------------------------------------------------
 
-#    torch.cuda.synchronize()
-#    begin = time.perf_counter()
-   
-    output_analog = torch.zeros(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
-   # output_analog1 = torch.zeros(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
-
-    for i in range(16):
-        input_1bit = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
-        #for batch in range(batch_size):
-        for xrow in range(xbars_row):
-             for xcol in range(xbars_col):
-                 # ----- Put your own function here -----
+    if bit_stream == 1:
+        shift_add_bit_stream[-1] *= -1        # last bit --> subtract
+        shift_add_bit_stream = shift_add_bit_stream.expand((batch_size, xbars_row, xbars_col, XBAR_COL_SIZE//bit_slice_num, bit_stream_num)).transpose(3,4).to(device)
+        shift_add_bit_slice = shift_add_bit_slice.expand((batch_size, xbars_row, xbars_col, XBAR_COL_SIZE//bit_slice_num, bit_slice_num)).to(device)
+        output_reg = torch.zeros(batch_size, xbars_row, xbars_col, bit_stream_num, XBAR_COL_SIZE//bit_slice_num).to(device)
+        output_analog = torch.zeros(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
+        #output_analog1 = torch.zeros(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
+        for i in range(bit_stream_num): # 16bit input
+            input_stream = flatten_input[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
+            #####
+            Goffmat = Goff*torch.ones(batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1).to(device)
+            V_real = input_stream*Vmax/Nstates_stream
+            V_real_scaled = [(V_real-inmin_V)/(inmax_V-inmin_V)]
+            G_real = xbars*(Gon - Goff)/Nstates_slice +Goff
+            G_real_scaled = [(G_real-Goff)/(Gon-Goff)]
+            output_bias_all = torch.sum(torch.mul(Goffmat,V_real),3).unsqueeze(3).expand(batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1)
+            for xrow in range(xbars_row):
+                for xcol in range(xbars_col):
+                    # ----- Put your own function here -----
                     #input_t = input_1bit[:,xrow,0].t()
                     #output_analog_xbar = input_t.mm(xbars[xrow, xcol]) #edit IC
-                    pdb.set_trace()
-                    V_real = input_1bit*0.25/15
-                    G_real = xbars[xrow, xcol]*(1/100 - 1/600)/15 +1/600
-                    output_analog_xbar = torch.mul(xbars[xrow, xcol], input_1bit[:, xrow, 0])   # Product of each elements : [128 x 128]
-                    output_analog_xbar = torch.sum(output_analog_xbar, 2)    # output of one xbar : array of 128 currents
+                    
+                    #----------------V, G Conversion Start--------------------
+                    #t1 = time.time()
+                    #output_real = torch.mul(G_real[xrow,xcol], V_real[:, xrow, 0])
+                    #output_real = torch.sum(output_real,1)
+                    #G_real_flatten = G_real[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_COL_SIZE)
                     #pdb.set_trace()
-                 # --------------------------------------
+                    #G_real_flatten = G_real_flatten.unsqueeze(2).expand(batch_size, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1)
+                    #input_VG = torch.cat(V_real[:, xrow, 0], G_real_flatten)
+                    #output_niratio = model(input_VG)
+                    #output_bias = torch.mul(Goffmat,V_real[:,xrow,0])
+                    #pdb.set_trace()
+                    #output_bias = output_bias_all[:, xrow, 0].view(batch_size,XBAR_ROW_SIZE)
+                    #output_analog_xbar_real = ((output_real-output_bias)*Comp_factor)
+                    #output_analog_xbar_real = torch.round(output_analog_xbar_real)
+                    #t2 = time.time()
+                    #print('Time taken for V-G', t2-t1)
 
+                    #----------------V, G Conversion End--------------------
+
+                    #t1 = time.time()
+
+                    output_analog_xbar = torch.mul(xbars[xrow, xcol], input_stream[:, xrow, 0])   # Product of each elements : [128 x 128]
+                    output_analog_xbar = torch.sum(output_analog_xbar, 1)    # output of one xbar : array of 128 currents
+                    #pdb.set_trace()
+                    #t2 = time.time()
+                    #print('Time taken for normal', t2-t1)
+                    #input()
+                    # --------------------------------------
+                    pdb.set_trace()
                     output_analog[:, xrow, xcol] = output_analog_xbar
-#---------------------------------------------------------With Batchsize Loop---------------------------------------------			
-  #      for batch in range(batch_size):
-  #          for xrow in range(xbars_row):
-  #              for xcol in range(xbars_col):
+            #output_analog = torch.mul(xbars, input_stream)
+            #output_analog = torch.sum(output_analog,3)
+            #####
+            output_analog_ = torch.round(output_analog)
+            output_analog=output_analog.reshape(shift_add_bit_slice.shape)
+            output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_bit_slice), 4)
 
-  #               # ----- Put your own function here -----
-  #                  #input_t = input_1bit[:,xrow,0].t()
-  #                  #output_analog_xbar = input_t.mm(xbars[xrow, xcol]) #edit IC
-  #                  #pdb.set_trace()
-  #                  output_analog_xbar1 = torch.mul(xbars[xrow, xcol], input_1bit[batch, xrow, 0])   # Product of each elements : [128 x 128]
-  #                  output_analog_xbar1 = torch.sum(output_analog_xbar1, 1)    # output of one xbar : array of 128 currents
-  #                  #pdb.set_trace()
-  #               # --------------------------------------
-
-  #                  output_analog1[batch, xrow, xcol] = output_analog_xbar1
-  #      pdb.set_trace()
-      
-        output_analog_=output_analog.reshape(shift_add_bit_slice.shape)
-        output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog_, shift_add_bit_slice), 4)
-#        torch.cuda.synchronize()
-#        print(time.perf_counter() - begin)
-
-# -----------------------------------------------------------------------------------------------------------------------------------------------
-
-    output = torch.sum(torch.mul(output_reg, shift_add_1bit), 3)
-    # output shape: [batch_size, xbar_rows, xbar_cols, col_vals]
-    subt = output[:, :, bias_addr[0], bias_addr[1]].expand(output.shape[2], output.shape[3],-1,-1).permute(2,3,0,1)
-    output = output.sub(subt)
+        output = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 3)
+        subt = output[:, :, bias_addr[0], bias_addr[1]].expand(output.shape[2], output.shape[3],-1,-1).permute(2,3,0,1)
+        output = output.sub(subt)
      
-    output.div_(2**12)
-    output.trunc_()
-    output.fmod_(2**16)
-    output.div_(2**12)
+        output.div_(2**12).trunc_().fmod_(2**16).div_(2**12)
+        # + sum xbar_rows
+        output = torch.sum(output, 1).reshape(batch_size, -1)
+    else:
+        shift_add_bit_stream = shift_add_bit_stream.expand((2, batch_size, xbars_row, xbars_col, XBAR_COL_SIZE//bit_slice_num, bit_stream_num)).transpose(4,5).to(device)
+        shift_add_bit_slice = shift_add_bit_slice.expand((2, batch_size, xbars_row, xbars_col, XBAR_COL_SIZE//bit_slice_num, bit_slice_num)).to(device)
+        output_reg = torch.zeros(2, batch_size, xbars_row, xbars_col, bit_stream_num, XBAR_COL_SIZE//bit_slice_num).to(device)
+        output_analog = torch.zeros(2, batch_size, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
+        for i in range(bit_stream_num): # 16bit input
+            input_stream = input_split[:,:,:,:,-1-i].reshape((2, batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
+            #####
+            Goffmat = Goff*torch.ones(2,batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1).to(device)
+            V_real = input_stream*Vmax/Nstates_stream
+            V_real_scaled = [(V_real-inmin_V)/(inmax_V-inmin_V)]
+            G_real = xbars*(Gon - Goff)/Nstates_slice +Goff
+            G_real_scaled = [(G_real-Goff)/(Gon-Goff)]
+            output_bias_all = torch.sum(torch.mul(Goffmat,V_real),4).unsqueeze(4).expand(2,batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1)
+            for xsign in range(2):
+                for xrow in range(xbars_row):
+                    for xcol in range(xbars_col):
+                        # ----- Put your own function here -----
+                        #input_t = input_1bit[:,xrow,0].t()
+                        #output_analog_xbar = input_t.mm(xbars[xrow, xcol]) #edit IC
+                        
+                        #----------------V, G Conversion Start--------------------
+                        #t1 = time.time()
+                        output_real = torch.mul(G_real[xrow,xcol], V_real[xsign, :, xrow, 0])
+                        output_real = torch.sum(output_real,1)
+                        #G_real_flatten = G_real[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_COL_SIZE)
+                        #pdb.set_trace()
+                        #G_real_flatten = G_real_flatten.unsqueeze(2).expand(batch_size, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1)
+                        #input_VG = torch.cat(V_real[:, xrow, 0], G_real_flatten)
+                        #output_niratio = model(input_VG)
+                        #output_bias = torch.mul(Goffmat,V_real[:,xrow,0])
+                        #pdb.set_trace()
+                        output_bias = output_bias_all[xsign, :, xrow, 0].view(batch_size,XBAR_ROW_SIZE)
+                        output_analog_xbar_real = ((output_real-output_bias)*Comp_factor)
+                        #output_analog_xbar_real = torch.round(output_analog_xbar_real)
+                        #t2 = time.time()
+                        #print('Time taken for V-G', t2-t1)
 
+                        #----------------V, G Conversion End--------------------
+
+                        #t1 = time.time()
+
+                        #output_analog_xbar = torch.mul(xbars[xrow, xcol], input_stream[xsign, :, xrow, 0])   # Product of each elements : [128 x 128]
+                        #pdb.set_trace()
+                        #output_analog_xbar = torch.sum(output_analog_xbar, 1)    # output of one xbar : array of 128 currents
+                        #pdb.set_trace()
+                        #t2 = time.time()
+                        #print('Time taken for normal', t2-t1)
+                        #input()
+                        # --------------------------------------
+                        #pdb.set_trace()
+                        output_analog[xsign, :, xrow, xcol] = output_analog_xbar_real
+            #output_analog = torch.mul(xbars, input_stream)
+            #output_analog = torch.sum(output_analog,3)
+            #output_analog = torch.mul(xbars, input_stream)
+            #output_analog = torch.sum(output_analog,4)
+            ####
+            #output_analog = output_analog[0,:,:,:] - output_analog[1,:,:,:]
+            #pdb.set_trace()
+            output_analog_ = output_analog.reshape(shift_add_bit_slice.shape)
+            output_reg[:,:,:,:,i,:] = torch.sum(torch.mul(output_analog_, shift_add_bit_slice), 5) # -1
+        output_split = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 4)
+        subt = output_split[:, :, :, bias_addr[0], bias_addr[1]].expand(output_split.shape[3], output_split.shape[4],-1,-1, -1).permute(2,3,4,0,1)
+        output_split = output_split.sub(subt)
+        output_split.div_(2**12).trunc_().fmod_(2**16).div_(2**12)
+        # + sum xbar_rows
+        output_split = torch.sum(output_split, 2).reshape(2, batch_size, -1)
+        output = output_split[0].sub(output_split[1])
+        #pdb.set_trace()
+    #output_reg = torch.zeros(batch_size, xbars_row, xbars_col, bit_stream_num, int(XBAR_COL_SIZE/bit_slice_num)).to(device)
+# ---------------------------------------------------------- For Indranil & Mustafa -------------------------------------------------------------
     
-    # + sum xbar_rows
-    output = torch.sum(output, 1).reshape(batch_size, -1)
-
-    del shift_add_1bit, shift_add_bit_slice, output_reg
+    del shift_add_bit_stream, shift_add_bit_slice, output_reg
     torch.cuda.empty_cache()
 
     return output
-
-
 
 ##############################################################################################################################
 # Below is version 1
@@ -561,6 +667,7 @@ class xbar:
             output[i] = mvm_simple(input, self.weight[:,i*8:i*8+8])
         
         return output
+
 
 
 
