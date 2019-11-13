@@ -34,7 +34,11 @@ class Conv2d_mvm_function(Function):
         if acm_bit_frac == -1:
             acm_bit_frac = acm_bits//4*3
         if adc_bit == -1:
-            adc_bit = int(math.log2(XBAR_ROW_SIZE))+bit_slice
+            adc_bit = int(math.log2(XBAR_ROW_SIZE))
+            if bit_stream != 1:
+                adc_bit += bit_stream
+            if bit_slice != 1:
+                adc_bit += bit_slice
 
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 

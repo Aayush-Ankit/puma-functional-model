@@ -111,16 +111,16 @@ for m in net.modules():
                m.bias.data.uniform_(-stdv, stdv)
 
 
-torch.cuda.synchronize()
+#torch.cuda.synchronize()
 begin = time.time()
 result_net = net(inputs)
 
-torch.cuda.synchronize()
+#torch.cuda.synchronize()
 end = time.time()
 print(end-begin)
 result_mynet = mynet(inputs)
 
-torch.cuda.synchronize()
+#torch.cuda.synchronize()
 end2 = time.time()
 print(end2-end)
 
