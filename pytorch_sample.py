@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import sys
 
+#from pytorch_mvm_class_v2 import *
 from pytorch_mvm_class import *
 
 ## To Indranil & Mustafa: This is for using 'for loops' in mvm_tensor. Just execute with '-i' at command line
@@ -66,10 +67,10 @@ class Net(nn.Module):
 class my_Net(nn.Module):
     def __init__(self):
         super(my_Net, self).__init__()
-        self.conv1 = Conv2d_mvm(3,64,3, bit_slice = 4, stride=1, bit_stream = 4, bias=False, ind=ind)   # --> my custom module for mvm
-        self.conv2 = Conv2d_mvm(64,64,3, bit_slice = 4, stride=2, bit_stream = 4, bias=False, ind=ind)
+        self.conv1 = Conv2d_mvm(3,64,3, bit_slice = 4, stride=1, bit_stream = 4, input_bits =16, weight_bits=16, bias=False, ind=ind)   # --> my custom module for mvm
+        self.conv2 = Conv2d_mvm(64,64,3, bit_slice = 4, stride=2, bit_stream = 4, input_bits = 16, weight_bits = 16,  bias=False, ind=ind)
         self.avgpool = nn.AvgPool2d(14)
-        self.linear = Linear_mvm(64,10, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        self.linear = Linear_mvm(64,10, bit_slice = 4, bit_stream = 4, input_bits = 16, weight_bits = 16, bias=False, ind=ind)
         #self.linear.weight.data = torch.clone(weights_lin)
 
     def forward(self, x):

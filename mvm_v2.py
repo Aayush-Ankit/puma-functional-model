@@ -90,10 +90,7 @@ def bit_slicing(weight, frac_bit, bit_slice, weight_bits, device):  # version 2
     # weight_bits = 16 or 32
     int_bit = weight_bits-frac_bit-1
     # clipping
-#    max_weight = torch.ones(weight.shape).mul_(2**int_bit-1/2**frac_bit).to(device)
-#    min_weight = torch.ones(weight.shape).mul_(-2**int_bit).to(device)
-#    weight = torch.where(weight < (2**int_bit-1/2**frac_bit), weight, max_weight)
-#    weight = torch.where(weight > -2**int_bit, weight, min_weight)
+
     weight = torch.clamp(weight, -2**int_bit, 2**int_bit-1/2**frac_bit)
 
     out_channel = weight.shape[0]
@@ -107,7 +104,7 @@ def bit_slicing(weight, frac_bit, bit_slice, weight_bits, device):  # version 2
             weight.div_(2**n)
         weight = slicing(weight, n)
 
-    weight[:out_channel].add_(2**(bit_slice-1)) #.fmod_(4)# with bias ## .fmod_(4) # for negative numbers. 4 = 2**2. 
+    weight[:out_channel].add_(2**bit_slice).fmod_(2**bit_slice) #.fmod_(4)# with bias ## .fmod_(4) # for negative numbers. 4 = 2**2. 
     weight[-out_channel:]= torch.floor(weight[-out_channel:])   # last layer
 
     # already made 2-bit. -> stop.
@@ -204,8 +201,8 @@ def mvm_tensor(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slice, b
             output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_bit_slice), 4)
 
         output = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 3)
-        subt = output[:, :, bias_addr[0], bias_addr[1]].expand(output.shape[2], output.shape[3],-1,-1).permute(2,3,0,1)
-        output = output.sub(subt)
+#        subt = output[:, :, bias_addr[0], bias_addr[1]].expand(output.shape[2], output.shape[3],-1,-1).permute(2,3,0,1)
+#        output = output.sub(subt)
 
         output.div_(2**(input_bit_frac + weight_bit_frac - acm_bit_frac)).trunc_()
         output.fmod_(2**acm_bit).div_(2**acm_bit_frac)
@@ -228,8 +225,8 @@ def mvm_tensor(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slice, b
             output_reg[:,:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_bit_slice), 5) # -1
 
         output_split = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 4)
-        subt = output_split[:, :, :, bias_addr[0], bias_addr[1]].expand(output_split.shape[3], output_split.shape[4],-1,-1, -1).permute(2,3,4,0,1)
-        output_split = output_split.sub(subt)
+#        subt = output_split[:, :, :, bias_addr[0], bias_addr[1]].expand(output_split.shape[3], output_split.shape[4],-1,-1, -1).permute(2,3,4,0,1)
+#        output_split = output_split.sub(subt)
 
         output_split.div_(2**(input_bit_frac + weight_bit_frac - acm_bit_frac)).trunc_()
         output_split.fmod_(2**acm_bit).div_(2**acm_bit_frac)
@@ -341,8 +338,8 @@ def mvm_tensor_ind(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slic
             output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_bit_slice), 4)
 
         output = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 3)
-        subt = output[:, :, bias_addr[0], bias_addr[1]].expand(output.shape[2], output.shape[3],-1,-1).permute(2,3,0,1)
-        output = output.sub(subt)
+#        subt = output[:, :, bias_addr[0], bias_addr[1]].expand(output.shape[2], output.shape[3],-1,-1).permute(2,3,0,1)
+#        output = output.sub(subt)
      
         output.div_(2**12).trunc_().fmod_(2**16).div_(2**12)
         # + sum xbar_rows
@@ -409,8 +406,8 @@ def mvm_tensor_ind(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slic
             output_analog_ = output_analog.reshape(shift_add_bit_slice.shape)
             output_reg[:,:,:,:,i,:] = torch.sum(torch.mul(output_analog_, shift_add_bit_slice), 5) # -1
         output_split = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 4)
-        subt = output_split[:, :, :, bias_addr[0], bias_addr[1]].expand(output_split.shape[3], output_split.shape[4],-1,-1, -1).permute(2,3,4,0,1)
-        output_split = output_split.sub(subt)
+#        subt = output_split[:, :, :, bias_addr[0], bias_addr[1]].expand(output_split.shape[3], output_split.shape[4],-1,-1, -1).permute(2,3,4,0,1)
+#        output_split = output_split.sub(subt)
         output_split.div_(2**12).trunc_().fmod_(2**16).div_(2**12)
         # + sum xbar_rows
         output_split = torch.sum(output_split, 2).reshape(2, batch_size, -1)
