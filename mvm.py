@@ -525,7 +525,6 @@ def mvm_tensor_ind(model, flatten_input, flatten_input_sign, bias_addr, xbars, b
 # ---------------------------------------------------------- For Indranil & Mustafa -------------------------------------------------------------
     del shift_add_bit_stream, shift_add_bit_slice, output_reg
     torch.cuda.empty_cache()
-    # pdb.set_trace()
     return output
 
     # return output, output2
