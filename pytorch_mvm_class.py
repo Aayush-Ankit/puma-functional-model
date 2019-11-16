@@ -10,9 +10,32 @@ import numpy as np
 from mvm import *
 
 import time
-
+os.environ['CUDA_VISIBLE_DEVICES']='3'
 torch.set_printoptions(threshold=10000)
+pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_dataset_5k_standard_sgd.pth.tar')
+#pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_low_nonideality_standard_sgd.pth.tar')
 
+class NN_model(nn.Module):
+    def __init__(self):
+         super(NN_model, self).__init__()
+         self.fc1 = nn.Linear(4160, 10000)
+         self.bn1 = nn.BatchNorm1d(10000)
+         self.relu1 = nn.ReLU(inplace=True)
+         self.do2 = nn.Dropout(0.5)
+         self.fc3 = nn.Linear(10000,64)
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        #pdb.set_trace()
+        out = self.fc1(x)
+        out = self.relu1(out)
+        out = self.do2(out)
+        out = self.fc3(out)
+        return out
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = NN_model()
+model.cuda() 
+model.eval()
+model.load_state_dict(pretrained_model['state_dict'])
 # Custom conv2d formvm function: Doesn't work for back-propagation
 class Conv2d_mvm_function(Function):
 
@@ -95,11 +118,10 @@ class Conv2d_mvm_function(Function):
                 flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
                 flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch, xbars.shape[0],XBAR_ROW_SIZE, bit_stream_num))
                 if ind == True:
-                    xbars_out = mvm_tensor_ind(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)   
+                    xbars_out  = mvm_tensor_ind(model, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)   
                 else:
                     xbars_out = mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
                 output[:,:,i,j] += xbars_out[:, :weight_channels_out]
-
 
         ctx.save_for_backward(input, weight, bias)
         ctx.stride = stride
@@ -244,7 +266,7 @@ class Linear_mvm_function(Function):
         if acm_bit_frac == -1:
             acm_bit_frac = acm_bits//4*3      
         if adc_bit == -1:
-            adc_bit = int(math.log2(XBAR_ROW_SIZE))+bit_slice
+            adc_bit = int(math.log2(XBAR_ROW_SIZE))+bit_slice+bit_stream
  
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -290,7 +312,7 @@ class Linear_mvm_function(Function):
 
         binary_input = binary_input.reshape((input_batch, xbars.shape[0], XBAR_ROW_SIZE, bit_stream_num))
         if ind == True:
-            xbars_out = mvm_tensor_ind(binary_input, input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
+            xbars_out = mvm_tensor_ind(model, binary_input, input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
         else:
             xbars_out = mvm_tensor(binary_input, input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
 

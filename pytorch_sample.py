@@ -21,7 +21,7 @@ labels = torch.tensor([1, 1])
 weights = torch.tensor([[[[-2.,1],[-1,2]],[[-4,2],[0,1]],[[-1,0],[-3,-2]]],[[[2.,1],[1,2]],[[3,2],[1,1]],[[1,2],[3,2]]]])/10
 trainloader = [[inputs, labels]]
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=256, shuffle=True, num_workers=4)
 inputs, labels = next(iter(trainloader))
 #trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
 #trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
@@ -43,7 +43,8 @@ class Net(nn.Module):
 
         self.conv1 = nn.Conv2d(3,64,3, bias=False, stride =1 )
         self.conv2 = nn.Conv2d(64,64,3, bias=False, stride =2 )
-        self.avgpool = nn.AvgPool2d(14)
+        self.conv3 = nn.Conv2d(64,64,3, bias=False, stride =2 )
+        self.avgpool = nn.AvgPool2d(6)
         self.linear = nn.Linear(64,10, bias = False)
         #print(self.linear.weight.data.shape)
         #self.linear.weight.data = torch.clone(weights_lin)
@@ -52,39 +53,52 @@ class Net(nn.Module):
         #self.conv1.weight.data = torch.clone(weights_conv[0])
         print(self.conv1.weight.data[0][0][0])
         x = self.conv1(x)
+        y = x.clone()
 
         #self.conv2.weight.data = torch.clone(weights_conv[1])
         print(self.conv2.weight.data[0][0][0])
         x = self.conv2(x)
+        z = x.clone()
+        print(self.conv3.weight.data[0][0][0])
+        x = self.conv3(x)
+        w = x.clone()
         #pdb.set_trace()
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         x = self.linear(x)
-        return x
+        return x, y, z, w
 
 
 class my_Net(nn.Module):
     def __init__(self):
         super(my_Net, self).__init__()
-        self.conv1 = Conv2d_mvm(3,64,3, bit_slice = 4, stride=1, bit_stream = 4, bias=False, ind=ind)   # --> my custom module for mvm
-        self.conv2 = Conv2d_mvm(64,64,3, bit_slice = 4, stride=2, bit_stream = 4, bias=False, ind=ind)
-        self.avgpool = nn.AvgPool2d(14)
-        self.linear = Linear_mvm(64,10, bit_slice = 4, bit_stream = 4, bias=False, ind=ind)
+        self.conv1 = Conv2d_mvm(3,64,3,  stride=1, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind)   # --> my custom module for mvm
+        self.conv2 = Conv2d_mvm(64,64,3, stride=2, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind)
+        self.conv3 = Conv2d_mvm(64,64,3, stride=2, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind)
+        self.avgpool = nn.AvgPool2d(6)
+        self.linear = Linear_mvm(64,10, bias=False, bit_slice = 4, bit_stream = 4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind = ind)
         #self.linear.weight.data = torch.clone(weights_lin)
 
     def forward(self, x):
         self.conv1.weight.data = torch.clone(weights_conv[0])
         print(self.conv1.weight.data[0][0][0])
         x = self.conv1(x)
+        y = x.clone()
 
         self.conv2.weight.data = torch.clone(weights_conv[1])
         print(self.conv2.weight.data[0][0][0])
         x = self.conv2(x)
+        z = x.clone()
+        
+        self.conv3.weight.data = torch.clone(weights_conv[2])
+        print(self.conv3.weight.data[0][0][0])
+        x = self.conv3(x)
+        w = x.clone()
         x = self.avgpool(x)
         x = x.view(x.size(0),-1)
         self.linear.weight.data = torch.clone(weights_lin)
         x = self.linear(x)
-        return x
+        return x, y, z, w
 
 
 net = Net()
@@ -113,12 +127,12 @@ for m in net.modules():
 
 torch.cuda.synchronize()
 begin = time.time()
-result_net = net(inputs)
+result_net, conv1_out,conv2_out, conv3_out = net(inputs)
 
 torch.cuda.synchronize()
 end = time.time()
 print(end-begin)
-result_mynet = mynet(inputs)
+result_mynet, conv1_out_mvm, conv2_out_mvm, conv3_out_mvm = mynet(inputs)
 
 torch.cuda.synchronize()
 end2 = time.time()
@@ -126,6 +140,9 @@ print(end2-end)
 
 
 print(result_net[0])
+print(conv1_out[0][0][0])
 
 print(result_mynet[0])
+print(conv1_out_mvm[0][0][0])
 print(torch.norm(result_net-result_mynet))
+print('Conv norm', torch.norm(conv1_out-conv1_out_mvm))
