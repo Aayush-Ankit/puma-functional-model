@@ -54,8 +54,7 @@ idx4 = get_tree_index(idx2)         # [0, 2, 1, 3]
 idx8 = get_tree_index(idx4)         # [0, 4, 2, 6, 1, 5, 3, 7]
 idx16 = get_tree_index(idx8)        # [0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15]
 idx32 = get_tree_index(idx16)
-idxs = [[idx16, idx8, 0, idx4, 0, 0, 0, idx2],
-        [idx32, idx16, 0, idx8, 0, 0, 0, idx4, 0, 0, 0, 0, 0, 0, 0, idx2]]
+idxs = [idx2, idx4, idx8, idx16, idx32]
 
 def get_index_rearrange(idx, out_ch):   # version 2
   
@@ -94,10 +93,6 @@ def bit_slicing(weight, frac_bit, bit_slice, weight_bits, device):  # version 2
     # weight_bits = 16 or 32
     int_bit = weight_bits-frac_bit-1
     # clipping
-#    max_weight = torch.ones(weight.shape).mul_(2**int_bit-1/2**frac_bit).to(device)
-#    min_weight = torch.ones(weight.shape).mul_(-2**int_bit).to(device)
-#    weight = torch.where(weight < (2**int_bit-1/2**frac_bit), weight, max_weight)
-#    weight = torch.where(weight > -2**int_bit, weight, min_weight)
     weight = torch.clamp(weight, -2**int_bit, 2**int_bit-1/2**frac_bit)
 
     out_channel = weight.shape[0]
@@ -117,7 +112,7 @@ def bit_slicing(weight, frac_bit, bit_slice, weight_bits, device):  # version 2
     # already made 2-bit. -> stop.
     # If I use 2^n bit-slice, I d(on't have to slice more to make 1-bits and then combine it again. 
 
-    weight_idx = get_index_rearrange(idxs[weight_bits//32][bit_slice-1], out_channel)
+    weight_idx = get_index_rearrange(idxs[int(math.log2(weight_bits//bit_slice))-1], out_channel)
     bitslice = weight.clone()
     bitslice[weight_idx[0],:] = weight
     bitslice = bitslice.t()
@@ -155,7 +150,7 @@ def float_to_16bits_tensor(input, frac_bit, bit_stream, input_bits, device): # i
     input[:batch_size].add_(2**bit_stream).fmod_(2**bit_stream) # for negative numbers.  
     input[-batch_size:]= torch.floor(input[-batch_size:])   # last layer
 
-    input_idx = get_index_rearrange(idxs[input_bits//32][bit_stream-1], batch_size)
+    input_idx = get_index_rearrange(idxs[int(math.log2(input_bits//bit_stream)-1)], batch_size)
     bit_slice = input.clone()
     bit_slice[input_idx[0]] = input
     bit_slice = bit_slice.reshape(batch_size, input_bits//bit_stream, -1).transpose(1,2)
