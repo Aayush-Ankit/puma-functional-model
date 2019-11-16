@@ -50,7 +50,7 @@ def save_state(model, best_acc):
         if 'module' in key:
             state['state_dict'][key.replace('module.', '')] = \
                     state['state_dict'].pop(key)
-    torch.save(state, 'models/resnet20fp_cifar10.pth.tar')
+    torch.save(state, 'models/resnet20fp_cifar10_4x.pth.tar')
 def accuracy(output, target, training, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
     maxk = max(topk)

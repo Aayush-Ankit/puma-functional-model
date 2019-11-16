@@ -10,7 +10,7 @@ import numpy as np
 from mvm import *
 
 import time
-
+# os.environ['CUDA_VISIBLE_DEVICES']='3'
 torch.set_printoptions(threshold=10000)
 
 # Custom conv2d formvm function: Doesn't work for back-propagation
@@ -99,11 +99,10 @@ class Conv2d_mvm_function(Function):
                 flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
                 flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch, xbars.shape[0],XBAR_ROW_SIZE, bit_stream_num))
                 if ind == True:
-                    xbars_out = mvm_tensor_ind(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)   
+                    xbars_out  = mvm_tensor_ind(model, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)   
                 else:
                     xbars_out = mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
                 output[:,:,i,j] += xbars_out[:, :weight_channels_out]
-
 
         ctx.save_for_backward(input, weight, bias)
         ctx.stride = stride
@@ -248,11 +247,13 @@ class Linear_mvm_function(Function):
         if acm_bit_frac == -1:
             acm_bit_frac = acm_bits//4*3      
         if adc_bit == -1:
+
             adc_bit = int(math.log2(XBAR_ROW_SIZE))
             if bit_stream != 1:
                 adc_bit += bit_stream
             if bit_slice != 1:
                 adc_bit += bit_slice
+
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         weight_channels_out = weight.shape[0]
@@ -297,7 +298,7 @@ class Linear_mvm_function(Function):
 
         binary_input = binary_input.reshape((input_batch, xbars.shape[0], XBAR_ROW_SIZE, bit_stream_num))
         if ind == True:
-            xbars_out = mvm_tensor_ind(binary_input, input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
+            xbars_out = mvm_tensor_ind(model, binary_input, input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
         else:
             xbars_out = mvm_tensor(binary_input, input_sign_xbar, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
 

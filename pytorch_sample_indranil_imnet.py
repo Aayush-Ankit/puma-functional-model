@@ -1,5 +1,3 @@
-
-
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -14,9 +12,13 @@ import os
 import argparse
 from data import get_dataset
 from preprocess import get_transform
+import torchvision.transforms as transforms
+import torchvision.datasets as datasets
+import torch.distributed as dist
+import torch.utils.data.distributed
 from utils import *
 from torchvision.utils import save_image
-os.environ['CUDA_VISIBLE_DEVICES']= '3'
+
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -162,11 +164,13 @@ if __name__=='__main__':
                          metavar='N', help='mini-batch size (default: 256)')
     parser.add_argument('-i', default=False,
                          metavar='N', help='turn on Ind feature')
+    parser.add_argument('--data', action='store', default='/local/scratch/a/imagenet/imagenet2012/',
+            help='dataset path')
     parser.add_argument('--dataset', metavar='DATASET', default='cifar100',
                 help='dataset name or folder')
-    parser.add_argument('--arch', action='store', default='resnet20',
+    parser.add_argument('--arch', action='store', default='resnet18_imnet',
         help='the architecture for the network: resnet')
-    parser.add_argument('--model', '-a', metavar='MODEL', default='resnet20',
+    parser.add_argument('--model', '-a', metavar='MODEL', default='resnet18_imnet',
                 choices=model_names,
                 help='model architecture: ' +
                 ' | '.join(model_names) +
@@ -182,7 +186,7 @@ if __name__=='__main__':
     parser.add_argument('-cuda', '--cuda_gpu', default=0, type=int, metavar='N',
                 help='gpu index (default: 8)')
     args = parser.parse_args()
-    
+    os.environ['CUDA_VISIBLE_DEVICES']= str(args.cuda_gpu)
     
     if args.i == 'True':
         ind = True
@@ -193,7 +197,7 @@ if __name__=='__main__':
 
 
     print('==> building model',args.arch,'...')
-    if args.arch == 'vgg' or 'resnet20':
+    if args.arch == 'resnet18_imnet':
         #print(models.__dict__)
         model = models.__dict__[args.model]
         #model_config = {'input_size': args.input_size, 'dataset': args.dataset}
@@ -203,7 +207,7 @@ if __name__=='__main__':
 
 
     model = model()
-    model_mvm = models.__dict__['resnet20_mvm']
+    model_mvm = models.__dict__['resnet18_imnet_mvm']
     model_mvm = model_mvm(ind)
     #pdb.set_trace()
 
@@ -279,27 +283,39 @@ if __name__=='__main__':
     model.cuda()
     model_mvm.cuda()
     
+    print('Near Data Loadin')
+    traindir = os.path.join(args.data, 'train')
+    print(traindir)
+    valdir = os.path.join(args.data, 'val')
+    print(valdir)
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
 
-    default_transform = {
-        'train': get_transform(args.dataset,
-                               input_size=args.input_size, augment=True),
-        'eval': get_transform(args.dataset,
-                              input_size=args.input_size, augment=False)
-    }
-    transform = getattr(model, 'input_transform', default_transform)
-    train_data = get_dataset(args.dataset, 'train', transform['train'])
+    train_dataset = datasets.ImageFolder(
+        traindir,
+        transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ]))
+    torch_seed = 40#torch.initial_seed()
     trainloader = torch.utils.data.DataLoader(
-        train_data,
-        batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True)
+        train_dataset, batch_size=args.batch_size, shuffle=True,
+        num_workers=args.workers, pin_memory=True, sampler=None, drop_last=True)
 
-    test_data = get_dataset(args.dataset, 'val', transform['eval'])
     testloader = torch.utils.data.DataLoader(
-        test_data,
+        datasets.ImageFolder(valdir, transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize,
+        ])),
         batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+        num_workers=args.workers, pin_memory=True,drop_last=True)
 
-    classes = (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100)
+
+    print('Data Loading done')
     criterion = nn.CrossEntropyLoss()
 
     if args.evaluate:

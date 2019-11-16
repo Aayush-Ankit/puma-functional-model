@@ -13,28 +13,30 @@ os.environ['CUDA_VISIBLE_DEVICES']='1'
  
 XBAR_COL_SIZE = 64
 XBAR_ROW_SIZE = 64
-#pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_new_standard_sgd.pth.tar')
+pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_dataset_1k_standard_sgd.pth.tar')
 
-# class NN_model(nn.Module):
-#     def __init__(self):
-#          super(NN_model, self).__init__()
-#          self.fc1 = nn.Linear(4160, 10000)
-#          self.bn1 = nn.BatchNorm1d(10000)
-#          self.relu1 = nn.ReLU(inplace=True)
-#          self.do2 = nn.Dropout(0.5)
-#          self.fc3 = nn.Linear(10000,64)
-#     def forward(self, x):
-#         x = x.view(x.size(0), -1)
-#         #pdb.set_trace()
-#         out = self.fc1(x)
-#         out = self.relu1(out)
-#         out = self.do2(out)
-#         out = self.fc3(out)
-#         return out
-# #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# model = NN_model()
-# model.cuda() 
-# model.load_state_dict(pretrained_model['state_dict'])
+# pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_new_standard_sgd.pth.tar')
+
+class NN_model(nn.Module):
+    def __init__(self):
+         super(NN_model, self).__init__()
+         self.fc1 = nn.Linear(4160, 1000)
+         self.bn1 = nn.BatchNorm1d(1000)
+         self.relu1 = nn.ReLU(inplace=True)
+         self.do2 = nn.Dropout(0.5)
+         self.fc3 = nn.Linear(1000,64)
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        #pdb.set_trace()
+        out = self.fc1(x)
+        out = self.relu1(out)
+        out = self.do2(out)
+        out = self.fc3(out)
+        return out
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = NN_model()
+model.cuda() 
+model.load_state_dict(pretrained_model['state_dict'])
 
 def get_tree_index(idx):    # version 2
 
@@ -328,7 +330,7 @@ def mvm_tensor_ind(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slic
                     #print('Time taken for normal', t2-t1)
                     #input()
                     # --------------------------------------
-                    pdb.set_trace()
+                    # pdb.set_trace()
                     output_analog[:, xrow, xcol] = output_analog_xbar
             #output_analog = torch.mul(xbars, input_stream)
             #output_analog = torch.sum(output_analog,3)
