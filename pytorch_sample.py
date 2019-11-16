@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import sys
 
+#from pytorch_mvm_class_v2 import *
 from pytorch_mvm_class import *
 
 ## To Indranil & Mustafa: This is for using 'for loops' in mvm_tensor. Just execute with '-i' at command line
@@ -72,11 +73,13 @@ class Net(nn.Module):
 class my_Net(nn.Module):
     def __init__(self):
         super(my_Net, self).__init__()
+
         self.conv1 = Conv2d_mvm(3,64,3,  stride=1, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind)   # --> my custom module for mvm
         self.conv2 = Conv2d_mvm(64,64,3, stride=2, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind)
         self.conv3 = Conv2d_mvm(64,64,3, stride=2, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind)
         self.avgpool = nn.AvgPool2d(6)
         self.linear = Linear_mvm(64,10, bias=False, bit_slice = 4, bit_stream = 4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind = ind)
+
         #self.linear.weight.data = torch.clone(weights_lin)
 
     def forward(self, x):
@@ -125,16 +128,16 @@ for m in net.modules():
                m.bias.data.uniform_(-stdv, stdv)
 
 
-torch.cuda.synchronize()
+#torch.cuda.synchronize()
 begin = time.time()
 result_net, conv1_out,conv2_out, conv3_out = net(inputs)
 
-torch.cuda.synchronize()
+#torch.cuda.synchronize()
 end = time.time()
 print(end-begin)
 result_mynet, conv1_out_mvm, conv2_out_mvm, conv3_out_mvm = mynet(inputs)
 
-torch.cuda.synchronize()
+#torch.cuda.synchronize()
 end2 = time.time()
 print(end2-end)
 
@@ -143,6 +146,7 @@ print(result_net[0])
 print(conv1_out[0][0][0])
 
 print(result_mynet[0])
+
 print(conv1_out_mvm[0][0][0])
 print(torch.norm(result_net-result_mynet))
 print('Conv norm', torch.norm(conv1_out-conv1_out_mvm))
