@@ -25,3 +25,29 @@ To Indranil & Mustafa
 run your code with '-i' command like:
 "python pytorch_sample -i"
 And then for loops in mvm_tensor will work. 
+
+
+To run NN models: 
+
+CIFAR-100:
+python3 pytorch_sample_indranil.py -i <True for nonideal, False for ideal> -b <batch-size> --pretrained models/resnet20fp_cifar10.pth.tar --evaluate
+
+Required model files:
+resnet20.py
+resnet20_mvm.py
+__init__.py
+
+
+Note: resnet20_mvm.py has specifications for frac_bits for weights and inputs. Please change it inside the file. 
+
+ImageNet
+
+python3 pytorch_sample_indranil_imnet.py -i <True for nonideal, False for ideal> -b <batch-size> --pretrained models/resnet18_imnet_fp.pth.ar --evaluate
+
+Required model files:
+resnet18_imnet.py
+resnet18_imnet_mvm.py
+__init__.py
+
+
+Note: resnet18_imnet_mvm.py has specifications for frac_bits for weights and inputs. Please change it inside the file.
