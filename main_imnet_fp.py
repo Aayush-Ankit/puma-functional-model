@@ -200,8 +200,8 @@ def adjust_learning_rate(optimizer, epoch):
     if epoch in update_list:
         for param_group in optimizer.param_groups:
             index_epoch = update_list.index(epoch)
-        param_group['lr'] = lr_list[index_epoch]
-        param_group['weight_decay'] = wd_list[index_epoch]
+            param_group['lr'] = lr_list[index_epoch]
+            param_group['weight_decay'] = wd_list[index_epoch]
     return
 
 if __name__=='__main__':
@@ -400,7 +400,7 @@ if __name__=='__main__':
         params += [{'params':[value], 'lr': base_lr, 
             'weight_decay':0.0001}]
     #optimizer = optim.Adam(params,lr=0.10,weight_decay=0.00001)
-        optimizer = optim.SGD(params, momentum = float(args.momentum), lr=0.10,weight_decay=0.0001,dampening=0)
+        optimizer = optim.SGD(params, momentum = float(args.momentum), lr=0.10,weight_decay=0.0001, nesterov=True, dampening=0)
     criterion = nn.CrossEntropyLoss()
 
     # define the binarization operator
@@ -412,7 +412,7 @@ if __name__=='__main__':
         exit(0)
 
     # start training
-    for epoch in range(23, args.epochs):
+    for epoch in range(1, args.epochs):
         adjust_learning_rate(optimizer, epoch)
         [trainacc,train_loss] = train(epoch,model)
         [testacc,test_loss] = test()

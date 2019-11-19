@@ -31,7 +31,7 @@ import random
 
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
-os.environ['CUDA_VISIBLE_DEVICES']='1'
+os.environ['CUDA_VISIBLE_DEVICES']='2'
 
 #os.environ['CUDA_VISIBLE_DEVICES']='0'
 #from models import resnet

@@ -41,7 +41,6 @@ class Conv2d_mvm_function(Function):
                 adc_bit += bit_slice
 
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
         weight_channels_out = weight.shape[0]
         weight_channels_in = weight.shape[1]
         weight_row = weight.shape[2]
@@ -112,6 +111,7 @@ class Conv2d_mvm_function(Function):
                 else:
                     xbars_out = mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
                                 mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
+
                 output[:,:,i,j] += xbars_out[:, :weight_channels_out]
 
 

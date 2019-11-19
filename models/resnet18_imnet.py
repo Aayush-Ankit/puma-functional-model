@@ -82,6 +82,7 @@ class resnet(nn.Module):
         # t1 = time.time()
         # print('Time taken: ',t1-t)
         x = self.conv1(x)
+        print('Conv1: ', torch.mean(x))
         x = self.bn1(x)
         x = self.relu1(x)
         x = self.maxpool(x)
