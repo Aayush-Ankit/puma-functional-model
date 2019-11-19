@@ -17,14 +17,14 @@ trainloader = [[inputs, labels]]
 #trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
 #trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
 
-inputs = torch.rand(64,128,32,32).sub(0.5).mul(0.5)
-weights = torch.rand(256,128,3,3).sub(0.5).mul(0.5)
+inputs = torch.rand(3,16,5,5).sub(0.5).mul(0.5)
+weights = torch.rand(16,16,3,3).sub(0.5).mul(0.5)
 
 
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(256,512,3, bias=False)
+        self.conv1 = nn.Conv2d(3,16,3, bias=False)
         self.conv1.weight.data = torch.clone(weights)
 
     def forward(self, x):
@@ -36,7 +36,7 @@ class Net(nn.Module):
 class my_Net(nn.Module):
     def __init__(self):
         super(my_Net, self).__init__()
-        self.conv1 = Conv2d_mvm(256,512,3, bias=False)   # --> my custom module for m
+        self.conv1 = Conv2d_mvm(3,16,3, input_bits = 4, weight_bits = 4, bias=False)   # --> my custom module for m
         self.conv1.weight.data = torch.clone(weights)
 
     def forward(self, x):
