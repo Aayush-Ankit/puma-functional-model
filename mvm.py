@@ -460,7 +460,7 @@ def mvm_tensor_ind(model, flatten_input, flatten_input_sign, bias_addr, xbars, b
                         # #input()
                         # # --------------------------------------
                         # output_analog[xsign, :, xrow, xcol] = output_analog_xbar_real
-                        output_analog2[xsign, :, xrow, xcol] = output_analog_xbar_real2
+                        output_analog[xsign, :, xrow, xcol] = output_analog_xbar_real2
 
                 # output_real = output_real_out[xsign].permute(1,2,0,3).reshape(output_real_out.shape[1]*output_real_out.shape[2]*output_real_out.shape[3], output_real_out.shape[4])
                 # #input_VG_flatten = input_VG.permute(1,2,0,3,4).reshape(batch_size*input_VG.shape[1]*input_VG.shape[2], input_VG.shape[3])

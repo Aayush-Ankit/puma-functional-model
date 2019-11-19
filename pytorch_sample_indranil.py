@@ -9,14 +9,14 @@ import torch.optim as optim
 import sys
 import pdb
 import models
-from pytorch_mvm_class import *
+from pytorch_mvm_class_v2 import *
 import os
 import argparse
 from data import get_dataset
 from preprocess import get_transform
 from utils import *
 from torchvision.utils import save_image
-os.environ['CUDA_VISIBLE_DEVICES']= '3'
+os.environ['CUDA_VISIBLE_DEVICES']= '1'
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -134,8 +134,6 @@ def test_mvm():
                       'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                        epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
                        loss=losses, top1=top1, top5=top5))
-        if batch_idx == 10:
-            break
 
     acc = top1.avg
     # if acc > best_acc:
@@ -181,6 +179,8 @@ if __name__=='__main__':
                 help='number of data loading workers (default: 8)')
     parser.add_argument('-cuda', '--cuda_gpu', default=0, type=int, metavar='N',
                 help='gpu index (default: 8)')
+    parser.add_argument('-exp', '--experiment', default='16x16', metavar='N',
+                help='experiment name')
     args = parser.parse_args()
     
     

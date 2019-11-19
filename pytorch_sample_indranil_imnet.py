@@ -7,7 +7,7 @@ import torch.optim as optim
 import sys
 import pdb
 import models
-from pytorch_mvm_class import *
+from pytorch_mvm_class_v2 import *
 import os
 import argparse
 from data import get_dataset
@@ -18,7 +18,7 @@ import torch.distributed as dist
 import torch.utils.data.distributed
 from utils import *
 from torchvision.utils import save_image
-
+os.environ['CUDA_VISIBLE_DEVICES']= '2'
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -82,7 +82,7 @@ def test():
                       'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                        epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
                        loss=losses, top1=top1, top5=top5))
-        if batch_idx == 10:
+        if batch_idx == 20:
             break
 
 
@@ -136,7 +136,7 @@ def test_mvm():
                       'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                        epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
                        loss=losses, top1=top1, top5=top5))
-        if batch_idx == 10:
+        if batch_idx == 20:
             break
 
     acc = top1.avg
@@ -183,10 +183,10 @@ if __name__=='__main__':
                 help='image input size')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                 help='number of data loading workers (default: 8)')
-    parser.add_argument('-cuda', '--cuda_gpu', default=0, type=int, metavar='N',
+    parser.add_argument('-cuda', '--cuda_gpu', default=[0], type=int, metavar='N',
                 help='gpu index (default: 8)')
     args = parser.parse_args()
-    os.environ['CUDA_VISIBLE_DEVICES']= str(args.cuda_gpu)
+    # os.environ['CUDA_VISIBLE_DEVICES']= str(args.cuda_gpu)
     
     if args.i == 'True':
         ind = True
@@ -282,7 +282,9 @@ if __name__=='__main__':
             k=k+1
     model.cuda()
     model_mvm.cuda()
-    
+    if len(args.cuda_gpu)>1:
+        model = torch.nn.DataParallel(model.cuda(), device_ids=[0])
+        model_mvm = torch.nn.DataParallel(model_mvm.cuda(), device_ids=[0])
     print('Near Data Loadin')
     traindir = os.path.join(args.data, 'train')
     print(traindir)
@@ -323,7 +325,7 @@ if __name__=='__main__':
         test_mvm()
         exit(0)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     #net.to(device)
     # mynet.to(device)
     # inputs = inputs.to(device)

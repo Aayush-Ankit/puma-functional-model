@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 import sys
 import time
-from pytorch_mvm_class import *
+from pytorch_mvm_class_v2 import *
 __all__ = ['resnet20_mvm']
 
 
