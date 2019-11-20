@@ -16,7 +16,7 @@ from data import get_dataset
 from preprocess import get_transform
 from utils import *
 from torchvision.utils import save_image
-os.environ['CUDA_VISIBLE_DEVICES']= '1'
+os.environ['CUDA_VISIBLE_DEVICES']= '2'
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -108,7 +108,7 @@ def test_mvm():
     for batch_idx,(data, target) in enumerate(testloader):
         target = target.cuda()
         data_var = torch.autograd.Variable(data.cuda(), volatile=True)
-        target_var = torch.autograd.Variable(target, volatile=True)
+        target_var = torch.autograd.Variable(target.cuda(), volatile=True)
 
                                     
         output = model_mvm(data_var)
@@ -135,7 +135,9 @@ def test_mvm():
                        epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
                        loss=losses, top1=top1, top5=top5))
 
+
     acc = top1.avg
+ 
     # if acc > best_acc:
     #     best_acc = acc
     #     save_state(model, best_acc)

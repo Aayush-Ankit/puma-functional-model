@@ -82,7 +82,7 @@ def test():
                       'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                        epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
                        loss=losses, top1=top1, top5=top5))
-        if batch_idx == 20:
+        if batch_idx == 200:
             break
 
 
@@ -140,6 +140,7 @@ def test_mvm():
             break
 
     acc = top1.avg
+ 
     # if acc > best_acc:
     #     best_acc = acc
     #     save_state(model, best_acc)
@@ -185,6 +186,8 @@ if __name__=='__main__':
                 help='number of data loading workers (default: 8)')
     parser.add_argument('-cuda', '--cuda_gpu', default=[0], type=int, metavar='N',
                 help='gpu index (default: 8)')
+    parser.add_argument('-exp', '--experiment', default='16x16', metavar='N',
+                help='experiment name')
     args = parser.parse_args()
     # os.environ['CUDA_VISIBLE_DEVICES']= str(args.cuda_gpu)
     
@@ -322,7 +325,7 @@ if __name__=='__main__':
 
     if args.evaluate:
         test()
-        test_mvm()
+        #test_mvm()
         exit(0)
 
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
