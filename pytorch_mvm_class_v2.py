@@ -10,10 +10,35 @@ import numpy as np
 from mvm_v2 import *
 
 import time
-
+os.environ['CUDA_VISIBLE_DEVICES']='2'
 torch.set_printoptions(threshold=10000)
 
 # Custom conv2d formvm function: Doesn't work for back-propagation
+pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_2binp_4bwt_dataset_500_100k_standard_sgd.pth.tar')
+
+# # pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_new_standard_sgd.pth.tar')
+
+class NN_model(nn.Module):
+    def __init__(self):
+         super(NN_model, self).__init__()
+         # N=64
+         self.fc1 = nn.Linear(4160, 500)
+         # self.bn1 = nn.BatchNorm1d(500)
+         self.relu1 = nn.ReLU(inplace=True)
+         self.do2 = nn.Dropout(0.5)
+         self.fc3 = nn.Linear(500,64)
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        out = self.fc1(x)
+        out = self.relu1(out)
+        # out = self.do2(out)
+        out = self.fc3(out)
+        return out
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = NN_model()
+model.cuda() 
+model.eval()
+model.load_state_dict(pretrained_model['state_dict'])
 class Conv2d_mvm_function(Function):
 
     # Note that both forward and backward are @staticmethods
@@ -21,7 +46,7 @@ class Conv2d_mvm_function(Function):
     # +--------------------------+
     # |            MVM           |   
     # +--------------------------+
-    def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False):
+    def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True):
        
         ## fixed-16: 
         ## sign     : 1 
@@ -46,7 +71,7 @@ class Conv2d_mvm_function(Function):
         weight_row = weight.shape[2]
         weight_col = weight.shape[3]
 
-        weight_pos = torch.where
+        # weight_pos = torch.where
         length = weight_channels_in * weight_row * weight_col
         flatten_weight = torch.zeros(2, weight_channels_out, length).to(device)     ## W+ / W-
         
@@ -106,9 +131,13 @@ class Conv2d_mvm_function(Function):
                 flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
                 flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num))
                 if ind == True:
-                    xbars_out = mvm_tensor_ind(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
-                                mvm_tensor_ind(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) 
+                    # x = time.time()
+                    xbars_out = mvm_tensor_ind(model, loop, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
+                                mvm_tensor_ind(model, loop, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) 
+                    # y = time.time()
+                    # print('Time taken: ', y-x)
                 else:
+                    pdb.set_trace()
                     xbars_out = mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
                                 mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
 
@@ -159,7 +188,7 @@ class _ConvNd_mvm(nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel_size, stride,
                  padding, dilation, transposed, output_padding,
-                 groups, bias, padding_mode, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, ind, check_grad=False):
+                 groups, bias, padding_mode, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, ind, loop, check_grad=False):
         super(_ConvNd_mvm, self).__init__()
         if in_channels % groups != 0:
             raise ValueError('in_channels must be divisible by groups')
@@ -185,6 +214,7 @@ class _ConvNd_mvm(nn.Module):
         self.acm_bits = acm_bits
         self.acm_bit_frac = acm_bit_frac
         self.ind = ind
+        self.loop = loop
 
         if check_grad:
             tensor_constructor = torch.DoubleTensor # double precision required to check grad
@@ -229,7 +259,7 @@ class _ConvNd_mvm(nn.Module):
 class Conv2d_mvm(_ConvNd_mvm):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1,
-                 bias=True, padding_mode='zeros', check_grad=False, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False):
+                 bias=True, padding_mode='zeros', check_grad=False, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True):
         kernel_size = _pair(kernel_size)
         stride = _pair(stride)
         padding = _pair(padding)
@@ -237,11 +267,11 @@ class Conv2d_mvm(_ConvNd_mvm):
 
         super(Conv2d_mvm, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
-            False, _pair(0), groups, bias, padding_mode, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, ind)
+            False, _pair(0), groups, bias, padding_mode, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, ind, loop)
     #@weak_script_method
     def forward(self, input):
             return Conv2d_mvm_function.apply(input, self.weight, self.bias, self.stride,
-                   self.padding, self.dilation, self.groups, self.bit_slice, self.bit_stream, self.weight_bits, self.weight_bit_frac, self.input_bits, self.input_bit_frac, self.adc_bit, self.acm_bits, self.acm_bit_frac, self.ind)
+                   self.padding, self.dilation, self.groups, self.bit_slice, self.bit_stream, self.weight_bits, self.weight_bit_frac, self.input_bits, self.input_bit_frac, self.adc_bit, self.acm_bits, self.acm_bit_frac, self.ind, self.loop)
 
 
 class Linear_mvm_function(Function):
@@ -249,7 +279,7 @@ class Linear_mvm_function(Function):
     # Note that both forward and backward are @staticmethods
     @staticmethod
     # bias is an optional argument
-    def forward(ctx, input, weight, bias=None, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False):
+    def forward(ctx, input, weight, bias=None, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True):
 
         if weight_bit_frac == -1:
             weight_bit_frac = weight_bits//4*3
@@ -315,8 +345,9 @@ class Linear_mvm_function(Function):
 
         binary_input = binary_input.reshape((input_batch, xbars.shape[1], XBAR_ROW_SIZE, bit_stream_num))
         if ind == True:
-            xbars_out = mvm_tensor_ind(binary_input, input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
-                        mvm_tensor_ind(binary_input, input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
+            xbars_out = mvm_tensor_ind(model, loop, binary_input, input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
+                        mvm_tensor_ind(model, loop, binary_input, input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
+
         else:
             xbars_out = mvm_tensor(binary_input, input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
                         mvm_tensor(binary_input, input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
@@ -346,7 +377,7 @@ class Linear_mvm_function(Function):
         return grad_input, grad_weight, grad_bias
 
 class Linear_mvm(nn.Module):
-    def __init__(self, input_features, output_features, bias=True, bit_slice = 2, bit_stream = 1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind = False):
+    def __init__(self, input_features, output_features, bias=True, bit_slice = 2, bit_stream = 1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind = False, loop = True):
         super(Linear_mvm, self).__init__()
         self.input_features = input_features
         self.output_features = output_features
@@ -368,10 +399,11 @@ class Linear_mvm(nn.Module):
         self.acm_bits = acm_bits
         self.acm_bit_frac = acm_bit_frac
         self.ind = ind
+        self.loop = loop
 
     def forward(self, input):
         # See the autograd section for explanation of what happens here.
-        return Linear_mvm_function.apply(input, self.weight, self.bias, self.bit_slice, self.bit_stream, self.weight_bits, self.weight_bit_frac, self.input_bits, self.input_bit_frac, self.adc_bit, self.acm_bits, self.acm_bit_frac, self.ind)
+        return Linear_mvm_function.apply(input, self.weight, self.bias, self.bit_slice, self.bit_stream, self.weight_bits, self.weight_bit_frac, self.input_bits, self.input_bit_frac, self.adc_bit, self.acm_bits, self.acm_bit_frac, self.ind, self.loop)
 
     def extra_repr(self):
         # (Optional)Set the extra information about this module. You can test
