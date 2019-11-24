@@ -40,6 +40,7 @@ model = NN_model()
 model.cuda() 
 model.eval()
 #model.load_state_dict(pretrained_model['state_dict'])
+
 class Conv2d_mvm_function(Function):
 
     # Note that both forward and backward are @staticmethods
@@ -115,7 +116,7 @@ class Conv2d_mvm_function(Function):
         output = torch.zeros((input_batch, weight_channels_out, output_row, output_col)).to(device)
         flatten_binary_input = torch.zeros(input_batch, xbars.shape[1]*XBAR_ROW_SIZE, bit_stream_num).to(device)
         
-        ## DEBUG - delete unused tensors of weight and inputs
+        ## delete unused tensors of weight and inputs
         del flatten_weight, pos_bit_slice_weight, neg_bit_slice_weight, weight_xbar
         torch.cuda.empty_cache()
         
@@ -136,7 +137,6 @@ class Conv2d_mvm_function(Function):
                 flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num))
                 if ind == True:
                     # t1 = time.time()
-                    # pdb.set_trace()
                     xbars_out = mvm_tensor_ind(model, loop, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
                                 mvm_tensor_ind(model, loop, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) 
                     # t2 = time.time()
