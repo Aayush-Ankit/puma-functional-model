@@ -212,7 +212,6 @@ if __name__=='__main__':
     model = model()
     model_mvm = models.__dict__['resnet18_imnet_mvm']
     model_mvm = model_mvm(ind)
-    #pdb.set_trace()
 
     print('==> Initializing model parameters ...')
     weights_conv = []
@@ -280,7 +279,6 @@ if __name__=='__main__':
             m.num_batches_tracked = num_batches[j]
             j = j+1
         elif isinstance(m, Linear_mvm):
-            #pdb.set_trace()
             m.weight.data = weights_lin[k]
             k=k+1
     model.cuda()

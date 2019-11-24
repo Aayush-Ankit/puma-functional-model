@@ -14,7 +14,7 @@ os.environ['CUDA_VISIBLE_DEVICES']='2'
 torch.set_printoptions(threshold=10000)
 
 # Custom conv2d formvm function: Doesn't work for back-propagation
-pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_2binp_4bwt_dataset_500_100k_standard_sgd.pth.tar')
+#pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_2binp_4bwt_dataset_500_100k_standard_sgd.pth.tar')
 
 # # pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_new_standard_sgd.pth.tar')
 
@@ -38,7 +38,7 @@ class NN_model(nn.Module):
 model = NN_model()
 model.cuda() 
 model.eval()
-model.load_state_dict(pretrained_model['state_dict'])
+#model.load_state_dict(pretrained_model['state_dict'])
 class Conv2d_mvm_function(Function):
 
     # Note that both forward and backward are @staticmethods
@@ -137,7 +137,6 @@ class Conv2d_mvm_function(Function):
                     # y = time.time()
                     # print('Time taken: ', y-x)
                 else:
-                    pdb.set_trace()
                     xbars_out = mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
                                 mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
 

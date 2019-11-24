@@ -5,7 +5,8 @@ backup*
 
 models/*.tar
 *.tar
-Datasets/ 
+
+Datasets/
 results/
 
 *.pyc

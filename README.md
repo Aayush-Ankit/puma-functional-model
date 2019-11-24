@@ -1,4 +1,4 @@
-# mvm
+# PUMA Functional Simulator
 
 Python version: 3.7.3
 PyTorch version: 1.1.0
@@ -23,9 +23,7 @@ mvm class has parameters:
 | acm_bit_frac    | # of bits for fraction partof output         |  16 -> 12 / 32 -> 24 |
 
 
-To Indranil & Mustafa
-
-run your code with `-i` command like:
+To run with physical crossbar models, use `-i` command like:
 ```bash
 python pytorch_sample -i
 ```
