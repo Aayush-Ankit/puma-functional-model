@@ -10,11 +10,12 @@ import numpy as np
 from mvm_v2 import *
 
 import time
-os.environ['CUDA_VISIBLE_DEVICES']='2'
+os.environ['CUDA_VISIBLE_DEVICES']='0'
 torch.set_printoptions(threshold=10000)
 
 # Custom conv2d formvm function: Doesn't work for back-propagation
-#pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_2binp_4bwt_dataset_500_100k_standard_sgd.pth.tar')
+pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_ssw_dataset_500_100k_standard_sgd.pth.tar')
+
 
 # # pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_new_standard_sgd.pth.tar')
 
@@ -94,7 +95,6 @@ class Conv2d_mvm_function(Function):
 
         bit_slice_num = weight_bits//bit_slice
         bit_stream_num = input_bits//bit_stream
-
         bias_addr = [weight_channels_out//int(XBAR_COL_SIZE/bit_slice_num), weight_channels_out%int(XBAR_COL_SIZE/bit_slice_num)]      #####
         for i in range(xbar_row):
             for j in range(xbar_col):
@@ -114,9 +114,13 @@ class Conv2d_mvm_function(Function):
         output_col = (input_col - weight_col)//stride[1] + 1 
         output = torch.zeros((input_batch, weight_channels_out, output_row, output_col)).to(device)
         flatten_binary_input = torch.zeros(input_batch, xbars.shape[1]*XBAR_ROW_SIZE, bit_stream_num).to(device)
+        
+        ## DEBUG - delete unused tensors of weight and inputs
+        del flatten_weight, pos_bit_slice_weight, neg_bit_slice_weight, weight_xbar
+        torch.cuda.empty_cache()
+        
         flatten_input_sign_temp = torch.zeros(input_batch, xbars.shape[1]*XBAR_ROW_SIZE, bit_stream_num).to(device)
         flatten_input_sign_xbar= torch.zeros(input_batch, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num).to(device)
-
         for i in range(output_row):
             for j in range(output_col):
                 input_temp = input_pad[:,:, stride[0]*i:stride[0]*i+weight_row, stride[1]*j:stride[1]*j+weight_col].reshape(input_batch,-1)    ## one set of inputs --> flatten: n x 1
@@ -131,15 +135,15 @@ class Conv2d_mvm_function(Function):
                 flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
                 flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num))
                 if ind == True:
-                    # x = time.time()
+                    # t1 = time.time()
+                    # pdb.set_trace()
                     xbars_out = mvm_tensor_ind(model, loop, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
                                 mvm_tensor_ind(model, loop, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) 
-                    # y = time.time()
-                    # print('Time taken: ', y-x)
+                    # t2 = time.time()
+                    # print('Time taken: ', t2-t1)
                 else:
                     xbars_out = mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
                                 mvm_tensor(flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
-
                 output[:,:,i,j] += xbars_out[:, :weight_channels_out]
 
 
