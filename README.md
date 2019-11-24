@@ -34,7 +34,7 @@ To run NN models:
 
 CIFAR-100:
 ```bash
-python3 pytorch_sample_indranil.py -i <True for nonideal, False for ideal> -b <batch-size> --pretrained models/resnet20fp_cifar10.pth.tar --evaluate
+python3 pytorch_sample_cifar100.py -i <True for nonideal, False for ideal> -b <batch-size> --pretrained models/resnet20fp_cifar10.pth.tar --evaluate
 ```
 
 Required model files:
@@ -47,7 +47,7 @@ Note: resnet20_mvm.py has specifications for frac_bits for weights and inputs. P
 
 ImageNet
 ```bash
-python3 pytorch_sample_indranil_imnet.py -i <True for nonideal, False for ideal> -b <batch-size> --pretrained models/resnet18_imnet_fp.pth.ar --evaluate
+python3 pytorch_sample_imnet.py -i <True for nonideal, False for ideal> -b <batch-size> --pretrained models/resnet18_imnet_fp.pth.ar --evaluate
 ```
 Required model files:
 - resnet18_imnet.py
