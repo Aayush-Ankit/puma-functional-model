@@ -18,7 +18,7 @@ import torch.distributed as dist
 import torch.utils.data.distributed
 from utils import *
 from torchvision.utils import save_image
-os.environ['CUDA_VISIBLE_DEVICES']= '2'
+os.environ['CUDA_VISIBLE_DEVICES']= '1'
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -57,32 +57,32 @@ def test():
         data_var = torch.autograd.Variable(data.cuda(), volatile=True)
         target_var = torch.autograd.Variable(target, volatile=True)
 
-                                    
-        output = model(data_var)
-        loss= criterion(output, target_var)
-        prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
-        losses.update(loss.data, data.size(0))
-        top1.update(prec1[0], data.size(0))
-        top5.update(prec5[0], data.size(0))
+        if batch_idx>=0 and batch_idx<20:                            
+            output = model(data_var)
+            loss= criterion(output, target_var)
+            prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
+            losses.update(loss.data, data.size(0))
+            top1.update(prec1[0], data.size(0))
+            top5.update(prec5[0], data.size(0))
 
 
-        if flag == True:
-            if batch_idx % 1 == 0:
-                print('[{0}/{1}({2:.0f}%)]\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                       batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
-                       loss=losses, top1=top1, top5=top5))
-        else:
-            if batch_idx % 1 == 0:
-               print('Epoch: [{0}][{1}/{2}({3:.0f}%)]\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                       epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
-                       loss=losses, top1=top1, top5=top5))
-        if batch_idx == 200:
+            if flag == True:
+                if batch_idx % 1 == 0:
+                    print('[{0}/{1}({2:.0f}%)]\t'
+                          'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                          'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                          'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                           batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
+                           loss=losses, top1=top1, top5=top5))
+            else:
+                if batch_idx % 1 == 0:
+                   print('Epoch: [{0}][{1}/{2}({3:.0f}%)]\t'
+                          'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                          'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                          'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                           epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
+                           loss=losses, top1=top1, top5=top5))
+        if batch_idx == 19:
             break
 
 
@@ -112,31 +112,31 @@ def test_mvm():
         data_var = torch.autograd.Variable(data.cuda(), volatile=True)
         target_var = torch.autograd.Variable(target, volatile=True)
 
-                                    
-        output = model_mvm(data_var)
-        loss= criterion(output, target_var)
+        if batch_idx>=13 and batch_idx<20:                            
+            output = model_mvm(data_var)
+            loss= criterion(output, target_var)
 
-        prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
-        losses.update(loss.data, data.size(0))
-        top1.update(prec1[0], data.size(0))
-        top5.update(prec5[0], data.size(0))
-        if flag == True:
-            if batch_idx % 1 == 0:
-                print('[{0}/{1}({2:.0f}%)]\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                       batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
-                       loss=losses, top1=top1, top5=top5))
-        else:
-            if batch_idx % 1 == 0:
-               print('Epoch: [{0}][{1}/{2}({3:.0f}%)]\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                       epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
-                       loss=losses, top1=top1, top5=top5))
-        if batch_idx == 20:
+            prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
+            losses.update(loss.data, data.size(0))
+            top1.update(prec1[0], data.size(0))
+            top5.update(prec5[0], data.size(0))
+            if flag == True:
+                if batch_idx % 1 == 0:
+                    print('[{0}/{1}({2:.0f}%)]\t'
+                          'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                          'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                          'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                           batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
+                           loss=losses, top1=top1, top5=top5))
+            else:
+                if batch_idx % 1 == 0:
+                   print('Epoch: [{0}][{1}/{2}({3:.0f}%)]\t'
+                          'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                          'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                          'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                           epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
+                           loss=losses, top1=top1, top5=top5))  
+        if batch_idx == 19:
             break
 
     acc = top1.avg
@@ -325,7 +325,7 @@ if __name__=='__main__':
 
     if args.evaluate:
         test()
-        #test_mvm()
+        test_mvm()
         exit(0)
 
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

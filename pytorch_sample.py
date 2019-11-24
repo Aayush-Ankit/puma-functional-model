@@ -8,7 +8,7 @@ import sys
 
 #from pytorch_mvm_class_v2 import *
 from pytorch_mvm_class_v2 import *
-os.environ['CUDA_VISIBLE_DEVICES']= '3'
+os.environ['CUDA_VISIBLE_DEVICES']= '0'
 ## To Indranil & Mustafa: This is for using 'for loops' in mvm_tensor. Just execute with '-i' at command line
 ind = False
 for i in range(len(sys.argv)):
@@ -22,7 +22,7 @@ labels = torch.tensor([1, 1])
 weights = torch.tensor([[[[-2.,1],[-1,2]],[[-4,2],[0,1]],[[-1,0],[-3,-2]]],[[[2.,1],[1,2]],[[3,2],[1,1]],[[1,2],[3,2]]]])/10
 trainloader = [[inputs, labels]]
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=4)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=32, shuffle=True, num_workers=4)
 inputs, labels = next(iter(trainloader))
 #trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
 #trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
@@ -42,11 +42,11 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.conv1 = nn.Conv2d(3,256,3, bias=False, stride =1 )
-        self.conv2 = nn.Conv2d(256,256,3, bias=False, stride =2 )
-        self.conv3 = nn.Conv2d(256,256,3, bias=False, stride =2 )
+        self.conv1 = nn.Conv2d(3,512,3, bias=False, stride =1 )
+        self.conv2 = nn.Conv2d(512,512,3, bias=False, stride =2 )
+        self.conv3 = nn.Conv2d(512,512,3, bias=False, stride =2 )
         self.avgpool = nn.AvgPool2d(6)
-        self.linear = nn.Linear(256,10, bias = False)
+        self.linear = nn.Linear(512,10, bias = False)
         #print(self.linear.weight.data.shape)
         #self.linear.weight.data = torch.clone(weights_lin)
 
@@ -74,11 +74,11 @@ class my_Net(nn.Module):
     def __init__(self):
         super(my_Net, self).__init__()
 
-        self.conv1 = Conv2d_mvm(3,64,3,  stride=1, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind)   # --> my custom module for mvm
-        self.conv2 = Conv2d_mvm(64,64,3, stride=2, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind)
-        self.conv3 = Conv2d_mvm(64,64,3, stride=2, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind)
+        self.conv1 = nn.Conv2d(3,512,3,  stride=1, padding=0, bias=False)# bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)   # --> my custom module for mvm
+        self.conv2 = Conv2d_mvm(512,512,3, stride=2, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
+        self.conv3 = Conv2d_mvm(512,512,3, stride=2, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
         self.avgpool = nn.AvgPool2d(6)
-        self.linear = Linear_mvm(64,10, bias=False, bit_slice = 4, bit_stream = 4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind = ind)
+        self.linear = Linear_mvm(512,10, bias=False, bit_slice = 4, bit_stream = 4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind = ind)
 
         #self.linear.weight.data = torch.clone(weights_lin)
 
@@ -90,6 +90,7 @@ class my_Net(nn.Module):
 
         self.conv2.weight.data = torch.clone(weights_conv[1])
         print(self.conv2.weight.data[0][0][0])
+        print(self.conv2.ind)
         x = self.conv2(x)
         z = x.clone()
         

@@ -16,7 +16,7 @@ from data import get_dataset
 from preprocess import get_transform
 from utils import *
 from torchvision.utils import save_image
-os.environ['CUDA_VISIBLE_DEVICES']= '2'
+os.environ['CUDA_VISIBLE_DEVICES']= '0'
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -134,7 +134,8 @@ def test_mvm():
                       'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                        epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
                        loss=losses, top1=top1, top5=top5))
-
+        if batch_idx == 10:
+            break        
 
     acc = top1.avg
  
@@ -305,7 +306,7 @@ if __name__=='__main__':
     criterion = nn.CrossEntropyLoss()
 
     if args.evaluate:
-        test()
+       # test()
         test_mvm()
         exit(0)
 
