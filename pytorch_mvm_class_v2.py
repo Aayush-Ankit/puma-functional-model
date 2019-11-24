@@ -16,6 +16,7 @@ torch.set_printoptions(threshold=10000)
 # Custom conv2d formvm function: Doesn't work for back-propagation
 pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_ssw_dataset_500_100k_standard_sgd.pth.tar')
 
+
 # # pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_new_standard_sgd.pth.tar')
 
 class NN_model(nn.Module):
@@ -38,7 +39,7 @@ class NN_model(nn.Module):
 model = NN_model()
 model.cuda() 
 model.eval()
-model.load_state_dict(pretrained_model['state_dict'])
+#model.load_state_dict(pretrained_model['state_dict'])
 class Conv2d_mvm_function(Function):
 
     # Note that both forward and backward are @staticmethods

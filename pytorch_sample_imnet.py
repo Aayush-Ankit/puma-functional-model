@@ -1,5 +1,3 @@
-
-
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -14,9 +12,13 @@ import os
 import argparse
 from data import get_dataset
 from preprocess import get_transform
+import torchvision.transforms as transforms
+import torchvision.datasets as datasets
+import torch.distributed as dist
+import torch.utils.data.distributed
 from utils import *
 from torchvision.utils import save_image
-os.environ['CUDA_VISIBLE_DEVICES']= '0'
+os.environ['CUDA_VISIBLE_DEVICES']= '1'
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -55,32 +57,32 @@ def test():
         data_var = torch.autograd.Variable(data.cuda(), volatile=True)
         target_var = torch.autograd.Variable(target, volatile=True)
 
-                                    
-        output = model(data_var)
-        loss= criterion(output, target_var)
-        prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
-        losses.update(loss.data, data.size(0))
-        top1.update(prec1[0], data.size(0))
-        top5.update(prec5[0], data.size(0))
+        if batch_idx>=0 and batch_idx<20:                            
+            output = model(data_var)
+            loss= criterion(output, target_var)
+            prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
+            losses.update(loss.data, data.size(0))
+            top1.update(prec1[0], data.size(0))
+            top5.update(prec5[0], data.size(0))
 
 
-        if flag == True:
-            if batch_idx % 1 == 0:
-                print('[{0}/{1}({2:.0f}%)]\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                       batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
-                       loss=losses, top1=top1, top5=top5))
-        else:
-            if batch_idx % 1 == 0:
-               print('Epoch: [{0}][{1}/{2}({3:.0f}%)]\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                       epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
-                       loss=losses, top1=top1, top5=top5))
-        if batch_idx == 10:
+            if flag == True:
+                if batch_idx % 1 == 0:
+                    print('[{0}/{1}({2:.0f}%)]\t'
+                          'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                          'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                          'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                           batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
+                           loss=losses, top1=top1, top5=top5))
+            else:
+                if batch_idx % 1 == 0:
+                   print('Epoch: [{0}][{1}/{2}({3:.0f}%)]\t'
+                          'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                          'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                          'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                           epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
+                           loss=losses, top1=top1, top5=top5))
+        if batch_idx == 19:
             break
 
 
@@ -108,34 +110,34 @@ def test_mvm():
     for batch_idx,(data, target) in enumerate(testloader):
         target = target.cuda()
         data_var = torch.autograd.Variable(data.cuda(), volatile=True)
-        target_var = torch.autograd.Variable(target.cuda(), volatile=True)
+        target_var = torch.autograd.Variable(target, volatile=True)
 
-                                    
-        output = model_mvm(data_var)
-        loss= criterion(output, target_var)
+        if batch_idx>=13 and batch_idx<20:                            
+            output = model_mvm(data_var)
+            loss= criterion(output, target_var)
 
-        prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
-        losses.update(loss.data, data.size(0))
-        top1.update(prec1[0], data.size(0))
-        top5.update(prec5[0], data.size(0))
-        if flag == True:
-            if batch_idx % 1 == 0:
-                print('[{0}/{1}({2:.0f}%)]\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                       batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
-                       loss=losses, top1=top1, top5=top5))
-        else:
-            if batch_idx % 1 == 0:
-               print('Epoch: [{0}][{1}/{2}({3:.0f}%)]\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                       epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
-                       loss=losses, top1=top1, top5=top5))
-        if batch_idx == 10:
-            break        
+            prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
+            losses.update(loss.data, data.size(0))
+            top1.update(prec1[0], data.size(0))
+            top5.update(prec5[0], data.size(0))
+            if flag == True:
+                if batch_idx % 1 == 0:
+                    print('[{0}/{1}({2:.0f}%)]\t'
+                          'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                          'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                          'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                           batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
+                           loss=losses, top1=top1, top5=top5))
+            else:
+                if batch_idx % 1 == 0:
+                   print('Epoch: [{0}][{1}/{2}({3:.0f}%)]\t'
+                          'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                          'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                          'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                           epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
+                           loss=losses, top1=top1, top5=top5))  
+        if batch_idx == 19:
+            break
 
     acc = top1.avg
  
@@ -163,11 +165,13 @@ if __name__=='__main__':
                          metavar='N', help='mini-batch size (default: 256)')
     parser.add_argument('-i', default=False,
                          metavar='N', help='turn on Ind feature')
+    parser.add_argument('--data', action='store', default='/local/scratch/a/imagenet/imagenet2012/',
+            help='dataset path')
     parser.add_argument('--dataset', metavar='DATASET', default='cifar100',
                 help='dataset name or folder')
-    parser.add_argument('--arch', action='store', default='resnet20',
+    parser.add_argument('--arch', action='store', default='resnet18_imnet',
         help='the architecture for the network: resnet')
-    parser.add_argument('--model', '-a', metavar='MODEL', default='resnet20',
+    parser.add_argument('--model', '-a', metavar='MODEL', default='resnet18_imnet',
                 choices=model_names,
                 help='model architecture: ' +
                 ' | '.join(model_names) +
@@ -180,12 +184,12 @@ if __name__=='__main__':
                 help='image input size')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                 help='number of data loading workers (default: 8)')
-    parser.add_argument('-cuda', '--cuda_gpu', default=0, type=int, metavar='N',
+    parser.add_argument('-cuda', '--cuda_gpu', default=[0], type=int, metavar='N',
                 help='gpu index (default: 8)')
     parser.add_argument('-exp', '--experiment', default='16x16', metavar='N',
                 help='experiment name')
     args = parser.parse_args()
-    
+    # os.environ['CUDA_VISIBLE_DEVICES']= str(args.cuda_gpu)
     
     if args.i == 'True':
         ind = True
@@ -196,7 +200,7 @@ if __name__=='__main__':
 
 
     print('==> building model',args.arch,'...')
-    if args.arch == 'vgg' or 'resnet20':
+    if args.arch == 'resnet18_imnet':
         #print(models.__dict__)
         model = models.__dict__[args.model]
         #model_config = {'input_size': args.input_size, 'dataset': args.dataset}
@@ -206,9 +210,8 @@ if __name__=='__main__':
 
 
     model = model()
-    model_mvm = models.__dict__['resnet20_mvm']
+    model_mvm = models.__dict__['resnet18_imnet_mvm']
     model_mvm = model_mvm(ind)
-    #pdb.set_trace()
 
     print('==> Initializing model parameters ...')
     weights_conv = []
@@ -276,41 +279,54 @@ if __name__=='__main__':
             m.num_batches_tracked = num_batches[j]
             j = j+1
         elif isinstance(m, Linear_mvm):
-            #pdb.set_trace()
             m.weight.data = weights_lin[k]
             k=k+1
     model.cuda()
     model_mvm.cuda()
-    
+    if len(args.cuda_gpu)>1:
+        model = torch.nn.DataParallel(model.cuda(), device_ids=[0])
+        model_mvm = torch.nn.DataParallel(model_mvm.cuda(), device_ids=[0])
+    print('Near Data Loadin')
+    traindir = os.path.join(args.data, 'train')
+    print(traindir)
+    valdir = os.path.join(args.data, 'val')
+    print(valdir)
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
 
-    default_transform = {
-        'train': get_transform(args.dataset,
-                               input_size=args.input_size, augment=True),
-        'eval': get_transform(args.dataset,
-                              input_size=args.input_size, augment=False)
-    }
-    transform = getattr(model, 'input_transform', default_transform)
-    train_data = get_dataset(args.dataset, 'train', transform['train'])
+    train_dataset = datasets.ImageFolder(
+        traindir,
+        transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ]))
+    torch_seed = 40#torch.initial_seed()
     trainloader = torch.utils.data.DataLoader(
-        train_data,
-        batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True)
+        train_dataset, batch_size=args.batch_size, shuffle=True,
+        num_workers=args.workers, pin_memory=True, sampler=None, drop_last=True)
 
-    test_data = get_dataset(args.dataset, 'val', transform['eval'])
     testloader = torch.utils.data.DataLoader(
-        test_data,
+        datasets.ImageFolder(valdir, transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize,
+        ])),
         batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+        num_workers=args.workers, pin_memory=True,drop_last=True)
 
-    classes = (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100)
+
+    print('Data Loading done')
     criterion = nn.CrossEntropyLoss()
 
     if args.evaluate:
-       # test()
+        test()
         test_mvm()
         exit(0)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     #net.to(device)
     # mynet.to(device)
     # inputs = inputs.to(device)

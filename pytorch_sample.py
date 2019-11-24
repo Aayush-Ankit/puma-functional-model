@@ -63,7 +63,6 @@ class Net(nn.Module):
         print(self.conv3.weight.data[0][0][0])
         x = self.conv3(x)
         w = x.clone()
-        #pdb.set_trace()
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         x = self.linear(x)
