@@ -139,7 +139,8 @@ class Conv2d_mvm_function(Function):
         if bias is not None and ctx.needs_input_grad[2]:
             grad_bias = grad_output.sum((0,2,3)).squeeze(0)
             
-        return grad_input, grad_weight, grad_bias, None, None, None, None
+        return grad_input, grad_weight, grad_bias, None, None, None, None, None, None, None, None, None, None, None, None, None, None 
+
 
 
 class _ConvNd_mvm(nn.Module):
@@ -324,7 +325,7 @@ class Linear_mvm_function(Function):
         if bias is not None and ctx.needs_input_grad[2]:
             grad_bias = grad_output.sum(0).squeeze(0)
 
-        return grad_input, grad_weight, grad_bias
+        return grad_input, grad_weight, grad_bias, None, None, None, None, None, None, None, None, None, None 
 
 class Linear_mvm(nn.Module):
     def __init__(self, input_features, output_features, bias=True, bit_slice = 2, bit_stream = 1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind = False):
