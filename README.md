@@ -1,14 +1,30 @@
 # PUMA Functional Simulator
 
-Python version: 3.7.3
-PyTorch version: 1.1.0
+## System requirements
 
-pytorch_sample.py has a simple example inputs and weights matrix, and a simple network.
+Below you can find the system requirements and versions tested.
+
+| Requirement | Version                    |
+| ----------- | -------------------------- |
+| Python      | 3.7.3                      |
+| PyTorch      | 1.1.0                      |
+
+
+## Quick Start
+
+`pytorch_sample.py` has a simple example inputs and weights matrix, and a simple network.
 By the command `python pytorch_sample.py`, you can run the code. 
 
 Conv2d_mvm is the custom module defined in pytorch_mvm_class.py
 
-mvm class has parameters:
+To run with physical crossbar models, use `-i` command like:
+```bash
+python pytorch_sample -i
+```
+And then for loops in mvm_tensor will work. 
+
+
+## Table of Supported parameters
 
 | parameters      | Meaning                                      | default value        |
 | --------------- | -------------------------------------------- | -------------------- |
@@ -23,14 +39,7 @@ mvm class has parameters:
 | acm_bit_frac    | # of bits for fraction partof output         |  16 -> 12 / 32 -> 24 |
 
 
-To run with physical crossbar models, use `-i` command like:
-```bash
-python pytorch_sample -i
-```
-And then for loops in mvm_tensor will work. 
-
-
-To run NN models: 
+## Running NN models
 
 CIFAR-100:
 ```bash
@@ -41,7 +50,6 @@ Required model files:
 - resnet20.py
 - resnet20_mvm.py
 - \_\_init\_\_.py
-
 
 Note: resnet20_mvm.py has specifications for frac_bits for weights and inputs. Please change it inside the file. 
 
@@ -54,5 +62,9 @@ Required model files:
 - resnet18_imnet_mvm.py
 - \_\_init\_\_.py
 
-
 Note: resnet18_imnet_mvm.py has specifications for frac_bits for weights and inputs. Please change it inside the file.
+
+
+## Authors
+
+Aayush Ankit, Dong-Eun Kim
