@@ -10,7 +10,7 @@ Below you can find the system requirements and versions tested.
 | PyTorch      | 1.1.0                      |
 
 
-## Quick Start
+## Quick start
 
 `pytorch_sample.py` has a simple example inputs and weights matrix, and a simple network.
 By the command `python pytorch_sample.py`, you can run the code. 
@@ -24,7 +24,7 @@ python pytorch_sample -i
 And then for loops in mvm_tensor will work. 
 
 
-## Table of Supported parameters
+## Supported configuration parameters
 
 | parameters      | Meaning                                      | default value        |
 | --------------- | -------------------------------------------- | -------------------- |
