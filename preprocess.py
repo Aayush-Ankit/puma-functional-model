@@ -3,13 +3,13 @@ import torchvision.transforms as transforms
 import random
 import numpy
 import os
-random.seed(2)
-numpy.random.seed(2)
-torch.manual_seed(2)
-torch.cuda.manual_seed_all(2)
-os.environ['PYTHONHASHSEED'] = str(2)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
+# random.seed(2)
+# numpy.random.seed(2)
+# torch.manual_seed(2)
+# torch.cuda.manual_seed_all(2)
+# os.environ['PYTHONHASHSEED'] = str(2)
+# torch.backends.cudnn.deterministic = True
+# torch.backends.cudnn.benchmark = False
 
 __imagenet_stats = {'mean': [0.485, 0.456, 0.406],
                    'std': [0.229, 0.224, 0.225]}

@@ -8,7 +8,7 @@ import sys
 
 #from pytorch_mvm_class_v2 import *
 from pytorch_mvm_class_v2 import *
-os.environ['CUDA_VISIBLE_DEVICES']= '0'
+os.environ['CUDA_VISIBLE_DEVICES']= '2'
 ## To Indranil & Mustafa: This is for using 'for loops' in mvm_tensor. Just execute with '-i' at command line
 ind = False
 for i in range(len(sys.argv)):

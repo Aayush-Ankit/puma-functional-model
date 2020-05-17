@@ -496,6 +496,7 @@ def mvm_tensor_ind(model, loop, flatten_input, flatten_input_sign, bias_addr, xb
                     #    for xcol in range(xbars_col):
 
                     #        input_VG[:,xrow,xcol,:] = torch.cat((G_real_flatten[:,xrow,xcol], V_real_scaled_loop[xsign, :, xrow, 0]),1)
+                    
                     V_int = V_real_scaled_loop.expand(2, batch_size, xbars_row, xbars_col, XBAR_ROW_SIZE,1)
                     input_VG = torch.cat((G_real_flatten, V_int[xsign]), 3)
                     output_real = output_real_out[xsign].permute(1,2,0,3).reshape(output_real_out.shape[1]*output_real_out.shape[2]*output_real_out.shape[3], output_real_out.shape[4])
