@@ -9,7 +9,7 @@ import torch.optim as optim
 import sys
 import pdb
 import models
-from pytorch_mvm_class_v2 import *
+from src.pytorch_mvm_class_v3 import *
 import os
 import argparse
 from data import get_dataset
