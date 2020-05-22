@@ -7,7 +7,7 @@ from torch.nn import init
 import math
 import numpy as np
 from src.mvm_v3 import *
-
+import pdb
 import time
 torch.set_printoptions(threshold=10000)
 
@@ -91,15 +91,17 @@ class Conv2d_mvm_function(Function):
         weight_xbar[0,:pos_bit_slice_weight.shape[0], :pos_bit_slice_weight.shape[1]] = pos_bit_slice_weight
         weight_xbar[1,:neg_bit_slice_weight.shape[0], :neg_bit_slice_weight.shape[1]] = neg_bit_slice_weight
 
-        xbars = torch.zeros((2, xbar_row, xbar_col, XBAR_ROW_SIZE, XBAR_COL_SIZE)).to(device)
+#        xbars = torch.zeros((2, xbar_row, xbar_col, XBAR_ROW_SIZE, XBAR_COL_SIZE)).to(device)
 
         bit_slice_num = weight_bits//bit_slice
         bit_stream_num = input_bits//bit_stream
         bias_addr = [weight_channels_out//int(XBAR_COL_SIZE/bit_slice_num), weight_channels_out%int(XBAR_COL_SIZE/bit_slice_num)]      #####
-        for i in range(xbar_row):
-            for j in range(xbar_col):
-                for k in range(2):
-                    xbars[k,i,j] = weight_xbar[k, i*XBAR_ROW_SIZE:(i+1)*XBAR_ROW_SIZE, j*XBAR_COL_SIZE:(j+1)*XBAR_COL_SIZE]
+#        for i in range(xbar_row):
+#            for j in range(xbar_col):
+#                for k in range(2):
+#                    xbars[k,i,j] = weight_xbar[k, i*XBAR_ROW_SIZE:(i+1)*XBAR_ROW_SIZE, j*XBAR_COL_SIZE:(j+1)*XBAR_COL_SIZE]
+#        pdb.set_trace()
+        xbars = weight_xbar.unfold(1,XBAR_ROW_SIZE, XBAR_COL_SIZE).unfold(2, XBAR_ROW_SIZE, XBAR_COL_SIZE)
 #        for i in range(xbar_row):
 #            for j in range(xbar_col):
 #                xbars[0,i,j] = pos_bit_slice_weight[i*XBAR_ROW_SIZE:(i+1)*XBAR_ROW_SIZE, j*XBAR_COL_SIZE:(j+1)*XBAR_COL_SIZE]
@@ -182,6 +184,7 @@ class Conv2d_mvm_function(Function):
   
         for i in range(output_row):
             for j in range(output_col):
+#                pdb.set_trace()
                 input_temp = input_pad[:,:, stride[0]*i:stride[0]*i+weight_row, stride[1]*j:stride[1]*j+weight_col].reshape(input_batch,-1)    ## one set of inputs --> flatten: n x 1
                 if bit_stream > 1:
                     
