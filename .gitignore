@@ -2,11 +2,11 @@
 __pycache__
 data/
 backup*
-stats.txt
+*.txt
 models/*.tar
 *.tar
 
 Datasets/
 results/
-
+*.sh
 *.pyc
