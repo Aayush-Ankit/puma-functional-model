@@ -213,6 +213,8 @@ class resnet(nn.Module):
         x = self.bn21(x)
 
         x = self.logsoftmax(x)
+        tend = time.time()
+        print('Time for one batch: ',tend-t)
 
 
         return x
@@ -330,83 +332,83 @@ class ResNet_cifar100(resnet):
         wbit_total = 16
         ibit_total = 16
 
-        self.conv1=Conv2d_mvm(3,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in, bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv1=Conv2d_mvm(3,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in, bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn1= nn.BatchNorm2d(16*self.inflate)
         self.relu1=nn.ReLU(inplace=True)
-        self.conv2=Conv2d_mvm(16*self.inflate,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in, bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv2=Conv2d_mvm(16*self.inflate,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in, bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn2= nn.BatchNorm2d(16*self.inflate)
         self.relu2=nn.ReLU(inplace=True)
-        self.conv3=Conv2d_mvm(16*self.inflate,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv3=Conv2d_mvm(16*self.inflate,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn3= nn.BatchNorm2d(16*self.inflate)
         self.relu3=nn.ReLU(inplace=True)
         #######################################################
 
-        self.conv4=Conv2d_mvm(16*self.inflate,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv4=Conv2d_mvm(16*self.inflate,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn4= nn.BatchNorm2d(16*self.inflate)
         self.relu4=nn.ReLU(inplace=True)
-        self.conv5=Conv2d_mvm(16*self.inflate,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv5=Conv2d_mvm(16*self.inflate,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn5= nn.BatchNorm2d(16*self.inflate)
         self.relu5=nn.ReLU(inplace=True)
         #######################################################
 
-        self.conv6=Conv2d_mvm(16*self.inflate,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv6=Conv2d_mvm(16*self.inflate,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn6= nn.BatchNorm2d(16*self.inflate)
         self.relu6=nn.ReLU(inplace=True)
-        self.conv7=Conv2d_mvm(16*self.inflate,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv7=Conv2d_mvm(16*self.inflate,16*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn7= nn.BatchNorm2d(16*self.inflate)
         self.relu7=nn.ReLU(inplace=True)
         #######################################################
 
         #########Layer################ 
-        self.conv8=Conv2d_mvm(16*self.inflate,32*self.inflate, kernel_size=3, stride=2, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv8=Conv2d_mvm(16*self.inflate,32*self.inflate, kernel_size=3, stride=2, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn8= nn.BatchNorm2d(32*self.inflate)
         self.relu8=nn.ReLU(inplace=True)
-        self.conv9=Conv2d_mvm(32*self.inflate,32*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv9=Conv2d_mvm(32*self.inflate,32*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn9= nn.BatchNorm2d(32*self.inflate)
-        self.resconv1=nn.Sequential(Conv2d_mvm(16*self.inflate,32*self.inflate, kernel_size=1, stride=2, padding=0, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True),
+        self.resconv1=nn.Sequential(Conv2d_mvm(16*self.inflate,32*self.inflate, kernel_size=1, stride=2, padding=0, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False),
         nn.BatchNorm2d(32*self.inflate),)
         self.relu9=nn.ReLU(inplace=True)
         #######################################################
 
-        self.conv10=Conv2d_mvm(32*self.inflate,32*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv10=Conv2d_mvm(32*self.inflate,32*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn10= nn.BatchNorm2d(32*self.inflate)
         self.relu10=nn.ReLU(inplace=True)
-        self.conv11=Conv2d_mvm(32*self.inflate,32*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv11=Conv2d_mvm(32*self.inflate,32*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn11= nn.BatchNorm2d(32*self.inflate)
         self.relu11=nn.ReLU(inplace=True)
         #######################################################
 
-        self.conv12=Conv2d_mvm(32*self.inflate,32*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv12=Conv2d_mvm(32*self.inflate,32*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn12= nn.BatchNorm2d(32*self.inflate)
         self.relu12=nn.ReLU(inplace=True)
-        self.conv13=Conv2d_mvm(32*self.inflate,32*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv13=Conv2d_mvm(32*self.inflate,32*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn13= nn.BatchNorm2d(32*self.inflate)
         self.relu13=nn.ReLU(inplace=True)
         #######################################################
 
         #########Layer################ 
-        self.conv14=Conv2d_mvm(32*self.inflate,64*self.inflate, kernel_size=3, stride=2, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv14=Conv2d_mvm(32*self.inflate,64*self.inflate, kernel_size=3, stride=2, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn14= nn.BatchNorm2d(64*self.inflate)
         self.relu14=nn.ReLU(inplace=True)
-        self.conv15=Conv2d_mvm(64*self.inflate,64*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv15=Conv2d_mvm(64*self.inflate,64*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn15= nn.BatchNorm2d(64*self.inflate)
-        self.resconv2=nn.Sequential(Conv2d_mvm(32*self.inflate,64*self.inflate, kernel_size=1, stride=2, padding=0, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True),
+        self.resconv2=nn.Sequential(Conv2d_mvm(32*self.inflate,64*self.inflate, kernel_size=1, stride=2, padding=0, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False),
         nn.BatchNorm2d(64*self.inflate),)
         self.relu15=nn.ReLU(inplace=True)
         #######################################################
 
-        self.conv16=Conv2d_mvm(64*self.inflate,64*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv16=Conv2d_mvm(64*self.inflate,64*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn16= nn.BatchNorm2d(64*self.inflate)
         self.relu16=nn.ReLU(inplace=True)
-        self.conv17=Conv2d_mvm(64*self.inflate,64*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv17=Conv2d_mvm(64*self.inflate,64*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn17= nn.BatchNorm2d(64*self.inflate)
         self.relu17=nn.ReLU(inplace=True)
         #######################################################
 
-        self.conv18=Conv2d_mvm(64*self.inflate,64*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv18=Conv2d_mvm(64*self.inflate,64*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn18= nn.BatchNorm2d(64*self.inflate)
         self.relu18=nn.ReLU(inplace=True)
-        self.conv19=Conv2d_mvm(64*self.inflate,64*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv19=Conv2d_mvm(64*self.inflate,64*self.inflate, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in,bit_stream=bit_stream_in,weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.bn19= nn.BatchNorm2d(64*self.inflate)
         self.relu19=nn.ReLU(inplace=True)
         #######################################################
@@ -415,7 +417,7 @@ class ResNet_cifar100(resnet):
         #########Layer################ 
         self.avgpool=nn.AvgPool2d(8)
         self.bn20= nn.BatchNorm1d(64*self.inflate)
-        self.fc=Linear_mvm(64*self.inflate,num_classes, bias=False, bit_slice = bit_slice_in, bit_stream = bit_stream_in, weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind = ind, loop = True)
+        self.fc=Linear_mvm(64*self.inflate,num_classes, bias=False, bit_slice = bit_slice_in, bit_stream = bit_stream_in, weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind = ind, loop = False)
         self.bn21= nn.BatchNorm1d(100)
         self.logsoftmax=nn.LogSoftmax()
 
