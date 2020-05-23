@@ -91,17 +91,17 @@ class Conv2d_mvm_function(Function):
         weight_xbar[0,:pos_bit_slice_weight.shape[0], :pos_bit_slice_weight.shape[1]] = pos_bit_slice_weight
         weight_xbar[1,:neg_bit_slice_weight.shape[0], :neg_bit_slice_weight.shape[1]] = neg_bit_slice_weight
 
-#        xbars = torch.zeros((2, xbar_row, xbar_col, XBAR_ROW_SIZE, XBAR_COL_SIZE)).to(device)
+        xbars = torch.zeros((2, xbar_row, xbar_col, XBAR_ROW_SIZE, XBAR_COL_SIZE)).to(device)
 
         bit_slice_num = weight_bits//bit_slice
         bit_stream_num = input_bits//bit_stream
         bias_addr = [weight_channels_out//int(XBAR_COL_SIZE/bit_slice_num), weight_channels_out%int(XBAR_COL_SIZE/bit_slice_num)]      #####
-#        for i in range(xbar_row):
-#            for j in range(xbar_col):
-#                for k in range(2):
-#                    xbars[k,i,j] = weight_xbar[k, i*XBAR_ROW_SIZE:(i+1)*XBAR_ROW_SIZE, j*XBAR_COL_SIZE:(j+1)*XBAR_COL_SIZE]
+        for i in range(xbar_row):
+            for j in range(xbar_col):
+                for k in range(2):
+                    xbars[k,i,j] = weight_xbar[k, i*XBAR_ROW_SIZE:(i+1)*XBAR_ROW_SIZE, j*XBAR_COL_SIZE:(j+1)*XBAR_COL_SIZE]
 #        pdb.set_trace()
-        xbars = weight_xbar.unfold(1,XBAR_ROW_SIZE, XBAR_COL_SIZE).unfold(2, XBAR_ROW_SIZE, XBAR_COL_SIZE)
+#        xbars = weight_xbar.unfold(1,XBAR_ROW_SIZE, XBAR_COL_SIZE).unfold(2, XBAR_ROW_SIZE, XBAR_COL_SIZE)
 #        for i in range(xbar_row):
 #            for j in range(xbar_col):
 #                xbars[0,i,j] = pos_bit_slice_weight[i*XBAR_ROW_SIZE:(i+1)*XBAR_ROW_SIZE, j*XBAR_COL_SIZE:(j+1)*XBAR_COL_SIZE]
@@ -193,10 +193,13 @@ class Conv2d_mvm_function(Function):
                     flatten_input_sign_xbar = flatten_input_sign_temp.reshape(input_batch, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num)
                     input_temp.abs_()
 
-                flatten_binary_input_temp = float_to_16bits_tensor_fast(input_temp, input_bit_frac, bit_stream, bit_stream_num, input_bits, device)   # batch x n x 16
+#                flatten_binary_input_temp = float_to_16bits_tensor_fast(input_temp, input_bit_frac, bit_stream, bit_stream_num, input_bits, device)   # batch x n x 16
 #                flatten_binary_input_temp = float_to_16bits_tensor(input_temp, input_bit_frac, bit_stream, input_bits, device)   # batch x n x 16
 
-                flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
+#                flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
+#                flatten_binary_input[:,:flatten_input_sign.shape[1]] = float_to_16bits_tensor(input_temp, input_bit_frac, bit_stream, bit_stream_num, input_bits, device)   # batch x n x 16                    
+                flatten_binary_input[:,:flatten_input_sign.shape[1]] = float_to_16bits_tensor_fast(input_temp, input_bit_frac, bit_stream, bit_stream_num, input_bits, device)   # batch x n x 16
+                
                 flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num))
                 if ind == True:
                     # t1 = time.time()
