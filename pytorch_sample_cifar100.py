@@ -105,6 +105,7 @@ def test_mvm():
     top1 = AverageMeter()
     top5 = AverageMeter()
 
+    tstart=time.time()
     for batch_idx,(data, target) in enumerate(testloader):
         target = target.cuda()
         data_var = torch.autograd.Variable(data.cuda(), volatile=True)
@@ -134,8 +135,8 @@ def test_mvm():
                       'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                        epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
                        loss=losses, top1=top1, top5=top5))
-        # if batch_idx == 10:
-        #     break        
+        if batch_idx == 9:
+             break        
 
     acc = top1.avg
  
@@ -146,7 +147,8 @@ def test_mvm():
 
     print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
           .format(top1=top1, top5=top5))
-
+    tend=time.time()
+    print('Time taken for {} batches:{}'.format(batch_idx+1, tend-tstart))
     # print('Best Accuracy: {:.2f}%\n'.format(best_acc))
     return acc, losses.avg
 
