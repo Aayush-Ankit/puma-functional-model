@@ -105,7 +105,7 @@ def float_to_16bits_tensor_fast(input, frac_bits, bit_slice, bit_slice_num, inpu
     input = input.mul_(2**(input_bits-1))
     #take the integer part of the input, which represents our 16bit number
     input = torch.floor(input)
-    #divide by scalar to get the decimal representation back
+    #divide by scalar to get the decimal representation back, MSB----->LSB
     input_sliced = torch.stack([torch.floor(torch.div(input, 2**(i*bit_slice))) - \
                                 torch.mul(torch.floor(torch.div(input, 2**((i+1)*bit_slice))), 2**bit_slice) for i in range(bit_slice_num-1,-1,-1) ])
 #    input = input_sliced
@@ -211,13 +211,13 @@ def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, fla
         input_split = torch.stack([input_pos, input_neg])
         
         for i in range(bit_stream_num): # 16bit input
-            input_stream = input_split[:,:,:,:,-1-i].reshape((2, batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
+            input_stream = input_split[:,:,:,:,-1-i].reshape((2, batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1)) #input is arranged from MSB---->LSB
             #####
             output_analog = torch.mul(xbars, input_stream)
-            output_analog = torch.sum(output_analog,4)
+            output_analog = torch.sum(output_analog,4)      #sum it along the row dim
             ####
             output_analog=output_analog.reshape(shift_add_bit_slice.shape)
-            output_reg[:,:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_bit_slice), 5) # -1
+            output_reg[:,:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_bit_slice), 5) # -1 # adding across bit sliced dimension
 
         output_split = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 4)
 #        subt = output_split[:, :, :, bias_addr[0], bias_addr[1]].expand(output_split.shape[3], output_split.shape[4],-1,-1, -1).permute(2,3,4,0,1)
