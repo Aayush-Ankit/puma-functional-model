@@ -53,7 +53,7 @@ class Conv2d_mvm_function(Function):
         ## sign     : 1 
         ## integer  : 3
         ## fraction : 12
-        tile_row , tile_col = 2,2
+        tile_row , tile_col = 1,1
         num_pixel = tile_row*tile_col
         if weight_bit_frac == -1:
             weight_bit_frac = weight_bits//4*3
@@ -180,12 +180,15 @@ class Conv2d_mvm_function(Function):
         
         unfold = nn.Unfold(kernel_size=(weight_row, weight_row), stride=(stride[0], stride[1]))
         
-        input_patch_row = (tile_row-1)*stride[0] + weight_row
-        input_patch_col = (tile_col-1)*stride[1] + weight_col
+        input_patch_row = (tile_row-1)*stride[0] + weight_row 
+        input_patch_col = (tile_col-1)*stride[1] + weight_col 
         for i in range(math.ceil(output_row/tile_row)):
             for j in range(math.ceil(output_col/tile_col)):
-                input_temp = unfold(input_pad[:,:,i*input_patch_row:(i+1)*input_patch_row, j*input_patch_col:(j+1)*input_patch_col]).permute(2,0,1)
-                input_temp = input_temp.reshape(input_temp.shape[0]*input_temp.shape[1],-1)          #new_batch_size = batch_size*#_of_output_pixel     
+#                print('{},{}'.format(i,j))
+#                pdb.set_trace()
+                input_temp = unfold(input_pad[:,:, stride[0]*i:stride[0]*i+input_patch_row, stride[1]*j:stride[1]*j+input_patch_col]).permute(2,0,1)
+                input_temp = input_temp.reshape(input_temp.shape[0]*input_temp.shape[1],-1)          #new_batch_size = batch_size*#_of_output_pixel    
+#                print('shape:{}'.format(input_temp.shape))
                 flatten_input_sign = torch.where(input_temp > 0, pos, neg).expand(bit_stream_num,-1,-1).permute(1, 2, 0) 
                 
                 if bit_stream >1:
@@ -216,7 +219,7 @@ class Conv2d_mvm_function(Function):
                                            acm_bit_frac, device)
                                 
     #                print(xbars_out.shape)
-                output[:,:,i*num_pixel:(i+1)*tile_row,j*num_pixel:(j+1)*tile_col] = xbars_out.reshape(tile_row, tile_col, input_batch, weight_channels_out).permute(2,3,0,1)
+                output[:,:,i*tile_row:(i+1)*tile_row,j*tile_col:(j+1)*tile_col] = xbars_out.reshape(tile_row, tile_col, input_batch, weight_channels_out).permute(2,3,0,1)
         #        output[:,:,i,j] += xbars_out[:, :weight_channels_out]
                 
                 
