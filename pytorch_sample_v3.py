@@ -21,7 +21,7 @@ os.environ['PYTHONHASHSEED'] = str(manual_seed)
 cudnn.deterministic = True 
 cudnn.benchmark = False 
 
-os.environ['CUDA_VISIBLE_DEVICES']= '1'
+os.environ['CUDA_VISIBLE_DEVICES']= '3'
 
 ## To Indranil & Mustafa: This is for using 'for loops' in mvm_tensor. Just execute with '-i' at command line
 ind = False
@@ -56,9 +56,9 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.conv1 = nn.Conv2d(3,512,3, bias=False, stride =1 )
-        self.conv2 = nn.Conv2d(512,512,3, bias=False, stride =2 )
-        self.conv3 = nn.Conv2d(512,512,3, bias=False, stride =2 )
+        self.conv1 = nn.Conv2d(3,512,3, bias=False, stride =1, padding=1)
+        self.conv2 = nn.Conv2d(512,512,3, bias=False, stride =2, padding=1)
+        self.conv3 = nn.Conv2d(512,512,3, bias=False, stride =2, padding=1)
         self.avgpool = nn.AvgPool2d(6)
         self.linear = nn.Linear(512,10, bias = False)
         #print(self.linear.weight.data.shape)
@@ -87,9 +87,9 @@ class my_Net(nn.Module):
     def __init__(self):
         super(my_Net, self).__init__()
 
-        self.conv1 = nn.Conv2d(3,512,3,  stride=1, padding=0, bias=False)# bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)   # --> my custom module for mvm
-        self.conv2 = Conv2d_mvm(512,512,3, stride=2, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
-        self.conv3 = Conv2d_mvm(512,512,3, stride=2, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
+        self.conv1 = nn.Conv2d(3,512,3,  stride=1, padding=1, bias=False)# bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)   # --> my custom module for mvm
+        self.conv2 = Conv2d_mvm(512,512,3, stride=2, padding=1, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
+        self.conv3 = Conv2d_mvm(512,512,3, stride=2, padding=1, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.avgpool = nn.AvgPool2d(6)
         self.linear = Linear_mvm(512,10, bias=False, bit_slice = 4, bit_stream = 4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind = ind)
 
