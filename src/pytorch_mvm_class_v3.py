@@ -186,13 +186,14 @@ class Conv2d_mvm_function(Function):
             for j in range(math.ceil(output_col/tile_col)):
                 input_temp = unfold(input_pad[:,:,i*input_patch_row:(i+1)*input_patch_row, j*input_patch_col:(j+1)*input_patch_col]).permute(2,0,1)
                 input_temp = input_temp.reshape(input_temp.shape[0]*input_temp.shape[1],-1)          #new_batch_size = batch_size*#_of_output_pixel     
-                flatten_input_sign = torch.where(input_temp > 0, pos, neg).expand(bit_stream_num,-1,-1).permute(1, 2, 0)                
+                flatten_input_sign = torch.where(input_temp > 0, pos, neg).expand(bit_stream_num,-1,-1).permute(1, 2, 0) 
                 
-                flatten_input_sign_temp[:,:flatten_input_sign.shape[1]] = flatten_input_sign
-                flatten_input_sign_xbar = flatten_input_sign_temp.reshape(input_batch*num_pixel, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num)
-                input_temp.abs_()
+                if bit_stream >1:
+                    flatten_input_sign_temp[:,:flatten_input_sign.shape[1]] = flatten_input_sign
+                    flatten_input_sign_xbar = flatten_input_sign_temp.reshape(input_batch*num_pixel, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num)
+                    input_temp.abs_()
+                
                 flatten_binary_input[:,:flatten_input_sign.shape[1]] = float_to_16bits_tensor_fast(input_temp, input_bit_frac, bit_stream, bit_stream_num, input_bits, device)   # batch x n x 16
-                
                 flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch*num_pixel, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num))  
 #                pdb.set_trace()
                 if ind == True:
@@ -215,7 +216,7 @@ class Conv2d_mvm_function(Function):
                                            acm_bit_frac, device)
                                 
     #                print(xbars_out.shape)
-                output[:,:,i*num_pixel:(i+1)*tile_row,j*num_pixel:(j+1)*tile_col] = xbars_out.reshape(num_pixel, input_batch, weight_channels_out).permute(1,2,0)
+                output[:,:,i*num_pixel:(i+1)*tile_row,j*num_pixel:(j+1)*tile_col] = xbars_out.reshape(tile_row, tile_col, input_batch, weight_channels_out).permute(2,3,0,1)
         #        output[:,:,i,j] += xbars_out[:, :weight_channels_out]
                 
                 
@@ -226,7 +227,7 @@ class Conv2d_mvm_function(Function):
         ctx.dilation = dilation
         ctx.groups = groups
 
-        return output.reshape(input_batch, weight_channels_out, output_row, output_col)
+        return output
 
     # This function has only a single output, so it gets only one gradient
     @staticmethod
