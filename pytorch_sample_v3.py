@@ -21,7 +21,7 @@ os.environ['PYTHONHASHSEED'] = str(manual_seed)
 cudnn.deterministic = True 
 cudnn.benchmark = False 
 
-os.environ['CUDA_VISIBLE_DEVICES']= '3'
+os.environ['CUDA_VISIBLE_DEVICES']= '1'
 
 ## To Indranil & Mustafa: This is for using 'for loops' in mvm_tensor. Just execute with '-i' at command line
 ind = False
@@ -142,36 +142,36 @@ for m in net.modules():
                m.bias.data.uniform_(-stdv, stdv)
 
 
-#time_net=[]
-#time_mynet=[]
-#for i in range(5):
-#    torch.cuda.synchronize()
-#    begin = time.time()
-#    result_net, conv1_out,conv2_out, conv3_out = net(inputs)
-#    
-#    torch.cuda.synchronize()
-#    end = time.time()
-#    time_net.append(end-begin)
-#    result_mynet, conv1_out_mvm, conv2_out_mvm, conv3_out_mvm = mynet(inputs)
-#    
-#    torch.cuda.synchronize()
-#    end2 = time.time()
-#    time_mynet.append(end2-end)
-#    
-#print('net average: ',sum(time_net)/len(time_net))
+time_net=[]
+time_mynet=[]
+for i in range(3):
+    begin = time.time()
+    print('net:')
+    result_net, conv1_out,conv2_out, conv3_out = net(inputs)
+    
+    end = time.time()
+    time_net.append(end-begin)
+    print('mynet:')
+    result_mynet, conv1_out_mvm, conv2_out_mvm, conv3_out_mvm = mynet(inputs)
+    
+    end2 = time.time()
+    time_mynet.append(end2-end)
+    torch.cuda.empty_cache()
+    
+print('net average: ',sum(time_net)/len(time_net))
+
+print('mynet average: ',sum(time_mynet)/len(time_mynet))
+
+#begin = time.time()
+#result_net, conv1_out,conv2_out, conv3_out = net(inputs)
 #
-#print('mynet average: ',sum(time_mynet)/len(time_mynet))
+#end = time.time()
+#print('time for net:',end-begin)
 #
-begin = time.time()
-result_net, conv1_out,conv2_out, conv3_out = net(inputs)
-
-end = time.time()
-print('time for net:',end-begin)
-
-result_mynet, conv1_out_mvm, conv2_out_mvm, conv3_out_mvm = mynet(inputs)
-
-end2 = time.time()
-print('time for mynet:',end2-end)
+#result_mynet, conv1_out_mvm, conv2_out_mvm, conv3_out_mvm = mynet(inputs)
+#
+#end2 = time.time()
+#print('time for mynet:',end2-end)
 
 
 print('result_net:',result_net[0])
