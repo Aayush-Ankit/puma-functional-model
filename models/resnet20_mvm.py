@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import sys
 import time
 import pdb
-from pytorch_mvm_class_v2 import *
+from src.pytorch_mvm_class_v3 import *
 __all__ = ['resnet20_mvm']
 
 

@@ -7,7 +7,7 @@ from torch.nn import init
 import pdb
 import math
 import numpy as np
-from mvm_v2 import *
+from src.mvm_v2 import *
 
 import time
 os.environ['CUDA_VISIBLE_DEVICES']='1'
@@ -15,8 +15,8 @@ torch.set_printoptions(threshold=10000)
 
 # Custom conv2d formvm function: Doesn't work for back-propagation
 # pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_dataset_500_50k_standard_sgd.pth.tar')
-pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_ssw_v2_dataset_500_100k_standard_sgd.pth.tar')
-# pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_v2_dataset_500_100k_standard_sgd.pth.tar')
+#pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_ssw_v2_dataset_500_100k_standard_sgd.pth.tar')
+pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_v2_dataset_500_100k_standard_sgd.pth.tar')
 
 
 # # pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_new_standard_sgd.pth.tar')

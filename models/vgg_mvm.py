@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 import sys
 import time
-from pytorch_mvm_class import *
+from src.pytorch_mvm_class import *
 __all__ = ['vgg_mvm']
 
 
