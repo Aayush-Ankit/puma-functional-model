@@ -13,7 +13,7 @@ torch.set_printoptions(threshold=10000)
 
 # Custom conv2d formvm function: Doesn't work for back-propagation
 pretrained_model_path = 'final_64x64_mlp2layer_xbar_64x64_100_all_v2_dataset_500_100k_standard_sgd.pth.tar'
-#pretrained_model = torch.load(pretrained_model_path)
+pretrained_model = torch.load(pretrained_model_path)
 
 
 # # pretrained_model = torch.load('final_64x64_mlp2layer_xbar_64x64_100_all_new_standard_sgd.pth.tar')
@@ -34,11 +34,11 @@ class NN_model(nn.Module):
         # out = self.do2(out)
         out = self.fc3(out)
         return out
-#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-#model = NN_model()
-#model.cuda() 
-#model.eval()
-#model.load_state_dict(pretrained_model['state_dict'])
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = NN_model()
+model.cuda() 
+model.eval()
+model.load_state_dict(pretrained_model['state_dict'])
 
 class Conv2d_mvm_function(Function):
 
@@ -53,7 +53,7 @@ class Conv2d_mvm_function(Function):
         ## sign     : 1 
         ## integer  : 3
         ## fraction : 12
-        tile_row , tile_col = 1,1
+        tile_row , tile_col = 2,2
         num_pixel = tile_row*tile_col
         if weight_bit_frac == -1:
             weight_bit_frac = weight_bits//4*3
@@ -148,50 +148,55 @@ class Conv2d_mvm_function(Function):
             shift_add_bit_slice = shift_add_bit_slice.expand((input_batch*num_pixel, xbars_row, xbars_col, XBAR_COL_SIZE//bit_slice_num, bit_slice_num)).to(device)
             output_reg = torch.zeros(input_batch*num_pixel, xbars_row, xbars_col, bit_stream_num, XBAR_COL_SIZE//bit_slice_num).to(device) # for 32-fixed  
             if ind == True:
-                output_analog = torch.zeros(input_batch, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
-                Goffmat = Goff*torch.ones(input_batch, xbars_row, 1, XBAR_ROW_SIZE, 1).to(device)
+                output_analog = torch.zeros(input_batch*num_pixel, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
+                Goffmat = Goff*torch.ones(input_batch*num_pixel, xbars_row, 1, XBAR_ROW_SIZE, 1).to(device)
                 G_real0 = (xbars[0]*(Gon - Goff)/Nstates_slice + Goff)
                 G_real_scaled0 = (G_real0-Goff)/(Gon-Goff)                
                 G_real_flatten0 = G_real_scaled0.permute(0,1,3,2).reshape(xbars_row,xbars_col,XBAR_ROW_SIZE*XBAR_COL_SIZE).to(device)
-                G_real_flatten0 = G_real_flatten0.unsqueeze(3).expand(input_batch, xbars_row,xbars_col, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1).to(device)
+                G_real_flatten0 = G_real_flatten0.unsqueeze(3).expand(input_batch*num_pixel, xbars_row,xbars_col, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1).to(device)
                 
                 G_real1 = (xbars[1]*(Gon - Goff)/Nstates_slice + Goff)
                 G_real_scaled1 = (G_real1-Goff)/(Gon-Goff)                
                 G_real_flatten1 = G_real_scaled1.permute(0,1,3,2).reshape(xbars_row,xbars_col,XBAR_ROW_SIZE*XBAR_COL_SIZE).to(device)
-                G_real_flatten1 = G_real_flatten1.unsqueeze(3).expand(input_batch, xbars_row,xbars_col, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1).to(device)
+                G_real_flatten1 = G_real_flatten1.unsqueeze(3).expand(input_batch*num_pixel, xbars_row,xbars_col, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1).to(device)
 
         else:
             shift_add_bit_stream = shift_add_bit_stream.expand((2, input_batch*num_pixel, xbars_row, xbars_col, XBAR_COL_SIZE//bit_slice_num, bit_stream_num)).transpose(4,5).to(device)
             shift_add_bit_slice = shift_add_bit_slice.expand((2, input_batch*num_pixel, xbars_row, xbars_col, XBAR_COL_SIZE//bit_slice_num, bit_slice_num)).to(device)
             output_reg = torch.zeros(2, input_batch*num_pixel, xbars_row, xbars_col, bit_stream_num, XBAR_COL_SIZE//bit_slice_num).to(device)
             if ind == True:
-                output_analog = torch.zeros(2, input_batch, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
-                Goffmat = Goff*torch.ones(2, input_batch, xbars_row, 1, XBAR_ROW_SIZE, 1).to(device)
+                output_analog = torch.zeros(2, input_batch*num_pixel, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
+                Goffmat = Goff*torch.ones(2, input_batch*num_pixel, xbars_row, 1, XBAR_ROW_SIZE, 1).to(device)
                 G_real0 = (xbars[0]*(Gon - Goff)/Nstates_slice +Goff)
                 G_real_scaled0 = (G_real0-Goff)/(Gon-Goff)                
                 G_real_flatten0 = G_real_scaled0.permute(0,1,3,2).reshape(xbars_row,xbars_col,XBAR_ROW_SIZE*XBAR_COL_SIZE).to(device)
-                G_real_flatten0 = G_real_flatten0.unsqueeze(3).expand(input_batch, xbars_row,xbars_col, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1).to(device)                
+                G_real_flatten0 = G_real_flatten0.unsqueeze(3).expand(input_batch*num_pixel, xbars_row,xbars_col, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1).to(device)                
 
                 G_real1 = (xbars[1]*(Gon - Goff)/Nstates_slice +Goff)
                 G_real_scaled1 = (G_real1-Goff)/(Gon-Goff)                
                 G_real_flatten1 = G_real_scaled1.permute(0,1,3,2).reshape(xbars_row,xbars_col,XBAR_ROW_SIZE*XBAR_COL_SIZE).to(device)
-                G_real_flatten1 = G_real_flatten1.unsqueeze(3).expand(input_batch, xbars_row,xbars_col, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1).to(device)                
+                G_real_flatten1 = G_real_flatten1.unsqueeze(3).expand(input_batch*num_pixel, xbars_row,xbars_col, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1).to(device)                
         
         
         unfold = nn.Unfold(kernel_size=(weight_row, weight_row), stride=(stride[0], stride[1]))
         
-        input_patch_row = (tile_row-1)*stride[0] + weight_row 
-        input_patch_col = (tile_col-1)*stride[1] + weight_col 
+        input_patch_row = (tile_row-1)*stride[0] + weight_row
+        stride_input_row = stride[0]*tile_row
+        input_patch_col = (tile_col-1)*stride[1] + weight_col
+        stride_input_col = stride[1]*tile_col
+        
+        #Tile size should be a multiple of output feature map size
+        assert output_row%tile_row == 0 and output_col%tile_col == 0, "Tile size should be a multiple of output feature map size"
+#        print('output:{}'.format(output.shape))
         for i in range(math.ceil(output_row/tile_row)):
             for j in range(math.ceil(output_col/tile_col)):
 #                print('{},{}'.format(i,j))
 #                pdb.set_trace()
-                input_temp = unfold(input_pad[:,:, stride[0]*i:stride[0]*i+input_patch_row, stride[1]*j:stride[1]*j+input_patch_col]).permute(2,0,1)
-                input_temp = input_temp.reshape(input_temp.shape[0]*input_temp.shape[1],-1)          #new_batch_size = batch_size*#_of_output_pixel    
+                input_temp = unfold(input_pad[:,:, stride_input_row*i:stride_input_row*i+input_patch_row, stride_input_col*j:stride_input_col*j+input_patch_col]).permute(2,0,1) # #patches, batchsize, k^2*I
+                input_temp = input_temp.reshape(input_batch*num_pixel,-1)          #new_batch_size = batch_size*#_of_output_pixel    
 #                print('shape:{}'.format(input_temp.shape))
-                flatten_input_sign = torch.where(input_temp > 0, pos, neg).expand(bit_stream_num,-1,-1).permute(1, 2, 0) 
-                
                 if bit_stream >1:
+                    flatten_input_sign = torch.where(input_temp > 0, pos, neg).expand(bit_stream_num,-1,-1).permute(1, 2, 0) 
                     flatten_input_sign_temp[:,:flatten_input_sign.shape[1]] = flatten_input_sign
                     flatten_input_sign_xbar = flatten_input_sign_temp.reshape(input_batch*num_pixel, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num)
                     input_temp.abs_()
@@ -219,7 +224,14 @@ class Conv2d_mvm_function(Function):
                                            acm_bit_frac, device)
                                 
     #                print(xbars_out.shape)
-                output[:,:,i*tile_row:(i+1)*tile_row,j*tile_col:(j+1)*tile_col] = xbars_out.reshape(tile_row, tile_col, input_batch, weight_channels_out).permute(2,3,0,1)
+                
+                out = xbars_out.reshape(num_pixel, input_batch, -1)
+                out = out.reshape(tile_row, tile_col, input_batch, -1)
+                out = out.permute(2, 3, 0, 1)  ## #batchsize, # o/p channels, tile_row, tile_col 
+                output[:,:,i*tile_row:(i+1)*tile_row,j*tile_col:(j+1)*tile_col] = out
+#        print(output)
+#        pdb.set_trace()
+                #xbars_out.reshape(input_batch, tile_row, tile_col, weight_channels_out).permute(0,3,1,2)
         #        output[:,:,i,j] += xbars_out[:, :weight_channels_out]
                 
                 
