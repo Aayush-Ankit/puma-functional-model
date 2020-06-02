@@ -7,7 +7,7 @@ import sys
 import time
 import os
 import argparse
-
+import pdb
  
 XBAR_COL_SIZE = 64
 XBAR_ROW_SIZE = 64
@@ -345,7 +345,7 @@ def mvm_tensor_ind(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg,
 #        shift_add_bit_slice[-i-1] = 2**(bit_slice*i)
 
     
-
+#    pdb.set_trace()
     if bit_stream == 1:
 #        shift_add_bit_stream[-1] *= -1        # last bit --> subtract
 #        shift_add_bit_stream = shift_add_bit_stream.expand((batch_size, xbars_row, xbars_col, XBAR_COL_SIZE//bit_slice_num, bit_stream_num)).transpose(3,4).to(device)
@@ -360,7 +360,7 @@ def mvm_tensor_ind(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg,
 #            Goffmat = Goff*torch.ones(batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1).to(device)
             # V_real = input_stream*Vmax/Nstates_stream
             # V_real_scaled = (V_real-inmin_V)/(inmax_V-inmin_V)
-            V_real_loop = V_real[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
+            V_real_loop = V_real[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))   #V_real.shape batchsize, xbar_rows, xbarsize, num_bitstreams
             V_real_scaled_loop = V_real_scaled[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
             output_bias_all = torch.sum(torch.mul(Goffmat,V_real_loop),3).unsqueeze(3).expand(batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1)
 #            G_real_flatten = G_real_scaled.permute(0,1,3,2).reshape(xbars_row,xbars_col,XBAR_ROW_SIZE*XBAR_COL_SIZE)
@@ -378,12 +378,19 @@ def mvm_tensor_ind(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg,
                     #output_real = torch.mul(G_real[xrow,xcol], V_real[xsign, :, xrow, 0])
                     #output_real = torch.sum(output_real,1)
                     output_real = output_real_out[:,xrow,xcol]
-                    # G_real_flatten2 = G_real[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_COL_SIZE)
-                    # V_real_flatten2 = V_real[xsign, :, xrow, 0].view(batch_size, XBAR_ROW_SIZE)
-                    # with open('dataset_V_out.txt','a') as f:
-                    #     np.savetxt(f,V_real_flatten2.cpu().numpy(), delimiter=',')
-                    # with open('dataset_G_out.txt','a') as f:
-                    #     np.savetxt(f,G_real_flatten2.cpu().numpy(), delimiter=',')
+#                    G_real_flatten2 = G_real[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_COL_SIZE)
+#                    V_real_flatten2 = V_real[xsign, :, xrow, 0].view(batch_size, XBAR_ROW_SIZE)
+#                    with open('dataset_V_out.txt','a') as f:
+#                        np.savetxt(f,V_real_flatten2.cpu().numpy(), delimiter=',')
+#                    with open('dataset_G_out.txt','a') as f:
+#                        np.savetxt(f,G_real_flatten2.cpu().numpy(), delimiter=',')
+#                    pdb.set_trace()
+#                    G_real_flatten2 = G_real[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_COL_SIZE)
+#                    V_real_flatten2 = V_real[:, xrow,:,i].view(batch_size, XBAR_ROW_SIZE)
+#                    with open('dataset_V_128_slice2_stream1.txt','a') as f:
+#                        np.savetxt(f,V_real_flatten2.cpu().numpy(), delimiter=',')
+#                    with open('dataset_G_128_slice2_stream1.txt','a') as f:
+#                        np.savetxt(f,G_real_flatten2.cpu().numpy(), delimiter=',')                    
                     #t = time.time()
                     #G_real_flatten = G_real_scaled[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_COL_SIZE)
                     # t1 = time.time()
