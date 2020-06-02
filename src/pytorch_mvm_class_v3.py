@@ -1,3 +1,5 @@
+import os
+os.environ['CUDA VISIBLE DEVICES'] = '0,1'
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -39,6 +41,7 @@ model = NN_model()
 model.cuda() 
 model.eval()
 model.load_state_dict(pretrained_model['state_dict'])
+#model = torch.nn.DataParallel(model) 
 
 class Conv2d_mvm_function(Function):
 
@@ -53,7 +56,7 @@ class Conv2d_mvm_function(Function):
         ## sign     : 1 
         ## integer  : 3
         ## fraction : 12
-        tile_row , tile_col = 2,2
+        tile_row , tile_col = 8,8
         num_pixel = tile_row*tile_col
         if weight_bit_frac == -1:
             weight_bit_frac = weight_bits//4*3
@@ -78,6 +81,7 @@ class Conv2d_mvm_function(Function):
         # weight_pos = torch.where
         length = weight_channels_in * weight_row * weight_col
         flatten_weight = torch.zeros(2, weight_channels_out, length).to(device)     ## W+ / W-
+#        self.register_buffer('flatten_weight', torch.zeros(2, weight_channels_out, length))
         weight = weight.reshape((weight_channels_out, length))
         flatten_weight[0] = torch.clamp(weight, min=0)  ## flatten weights
         flatten_weight[1] = torch.clamp(weight, max=0).abs()
@@ -101,14 +105,13 @@ class Conv2d_mvm_function(Function):
         bias_addr = [weight_channels_out//int(XBAR_COL_SIZE/bit_slice_num), weight_channels_out%int(XBAR_COL_SIZE/bit_slice_num)]      #####
 
         xbars = weight_xbar.unfold(1,XBAR_ROW_SIZE, XBAR_COL_SIZE).unfold(2, XBAR_ROW_SIZE, XBAR_COL_SIZE)
-
-
         input_batch = input.shape[0]
         input_channels = input.shape[1]     # weight_channels_in == input_channels
         input_row = input.shape[2] + padding[0]*2
         input_col = input.shape[3] + padding[1]*2
         input_pad = torch.zeros((input_batch, input_channels, input_row, input_col)).to(device)
         input_pad[:,:,padding[0]:input_row-padding[0],padding[1]:input_col-padding[1]] = input
+#        print('input device:',input_pad.get_device())
 #        pos = torch.ones(input_batch, input_channels, weight_row, weight_col).reshape(input_batch,-1).to(device)
 #        neg = pos.clone().fill_(0)
         pos = torch.ones(input_batch*num_pixel, input_channels*weight_row*weight_col).to(device)
@@ -121,7 +124,7 @@ class Conv2d_mvm_function(Function):
         flatten_binary_input = torch.zeros(input_batch*num_pixel, xbars.shape[1]*XBAR_ROW_SIZE, bit_stream_num).to(device)
         
         ## delete unused tensors of weight and inputs
-        del flatten_weight, pos_bit_slice_weight, neg_bit_slice_weight, weight_xbar
+#        del flatten_weight, pos_bit_slice_weight, neg_bit_slice_weight, weight_xbar
 
         flatten_input_sign_temp = torch.zeros(input_batch*num_pixel, xbars.shape[1]*XBAR_ROW_SIZE, bit_stream_num).to(device)
         flatten_input_sign_xbar= torch.zeros(input_batch*num_pixel, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num).to(device)
@@ -200,8 +203,12 @@ class Conv2d_mvm_function(Function):
                     flatten_input_sign_temp[:,:flatten_input_sign.shape[1]] = flatten_input_sign
                     flatten_input_sign_xbar = flatten_input_sign_temp.reshape(input_batch*num_pixel, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num)
                     input_temp.abs_()
+
+                flatten_binary_input_temp = float_to_16bits_tensor_fast(input_temp, input_bit_frac, bit_stream, bit_stream_num, input_bits, device)   # batch x n x 16
+#                print(flatten_binary_input_temp)
+                flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
                 
-                flatten_binary_input[:,:flatten_input_sign.shape[1]] = float_to_16bits_tensor_fast(input_temp, input_bit_frac, bit_stream, bit_stream_num, input_bits, device)   # batch x n x 16
+#                flatten_binary_input[:,:flatten_input_sign.shape[1]] = float_to_16bits_tensor_fast(input_temp, input_bit_frac, bit_stream, bit_stream_num, input_bits, device)   # batch x n x 16
                 flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch*num_pixel, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num))  
 #                pdb.set_trace()
                 if ind == True:
@@ -225,10 +232,12 @@ class Conv2d_mvm_function(Function):
                                 
     #                print(xbars_out.shape)
                 
-                out = xbars_out.reshape(num_pixel, input_batch, -1)
-                out = out.reshape(tile_row, tile_col, input_batch, -1)
-                out = out.permute(2, 3, 0, 1)  ## #batchsize, # o/p channels, tile_row, tile_col 
-                output[:,:,i*tile_row:(i+1)*tile_row,j*tile_col:(j+1)*tile_col] = out
+#                out = xbars_out.reshape(num_pixel, input_batch, -1)
+#                out = out.reshape(tile_row, tile_col, input_batch, -1)
+#                out = out.permute(2, 3, 0, 1)  
+#                output[:,:,i*tile_row:(i+1)*tile_row,j*tile_col:(j+1)*tile_col] = out
+                output[:,:,i*tile_row:(i+1)*tile_row,j*tile_col:(j+1)*tile_col] = xbars_out.reshape(tile_row, tile_col, input_batch, -1).permute(2,3,0,1)  ## #batchsize, # o/p channels, tile_row, tile_col 
+                
 #        print(output)
 #        pdb.set_trace()
                 #xbars_out.reshape(input_batch, tile_row, tile_col, weight_channels_out).permute(0,3,1,2)
@@ -276,7 +285,8 @@ class Conv2d_mvm_function(Function):
 
 class _ConvNd_mvm(nn.Module):
 
-    __constants__ = ['stride', 'padding', 'dilation', 'groups', 'bias', 'padding_mode', 'bit_slice', 'bit_stream','weight_bits', 'weight_bit_frac','input_bits', 'input_bit_frac','adc_bit','acm_bits', 'acm_bit_frac', 'ind']
+    __constants__ = ['stride', 'padding', 'dilation', 'groups', 'bias', 'padding_mode', 'bit_slice', 'bit_stream','weight_bits', 'weight_bit_frac','input_bits', 'input_bit_frac',
+                     'adc_bit','acm_bits', 'acm_bit_frac', 'ind']
 
     def __init__(self, in_channels, out_channels, kernel_size, stride,
                  padding, dilation, transposed, output_padding,
@@ -349,9 +359,8 @@ class _ConvNd_mvm(nn.Module):
         return s.format(**self.__dict__)
 
 class Conv2d_mvm(_ConvNd_mvm):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1,
-                 bias=True, padding_mode='zeros', check_grad=False, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros', check_grad=False, bit_slice=2, bit_stream=1,
+                 weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True):
         kernel_size = _pair(kernel_size)
         stride = _pair(stride)
         padding = _pair(padding)
@@ -362,8 +371,9 @@ class Conv2d_mvm(_ConvNd_mvm):
             False, _pair(0), groups, bias, padding_mode, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, ind, loop)
     #@weak_script_method
     def forward(self, input):
-            return Conv2d_mvm_function.apply(input, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups, self.bit_slice, 
-                                             self.bit_stream, self.weight_bits, self.weight_bit_frac, self.input_bits, self.input_bit_frac, self.adc_bit, self.acm_bits, self.acm_bit_frac, self.ind, self.loop)
+            return Conv2d_mvm_function.apply(input, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups, self.bit_slice, self.bit_stream, 
+                                             self.weight_bits, self.weight_bit_frac, self.input_bits, self.input_bit_frac, self.adc_bit, self.acm_bits, 
+                                             self.acm_bit_frac, self.ind, self.loop)
 
 
 class Linear_mvm_function(Function):
@@ -559,5 +569,5 @@ class Linear_mvm(nn.Module):
         # (Optional)Set the extra information about this module. You can test
         # it by printing an object of this class.
         return 'in_features={}, out_features={}, bias={}'.format(
-            self.in_features, self.out_features, self.bias is not None
+            self.input_features, self.output_features, self.bias is not None
         )
