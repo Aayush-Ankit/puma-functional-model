@@ -1,5 +1,5 @@
-import os
-os.environ['CUDA VISIBLE DEVICES'] = '0,1'
+#import os
+#os.environ['CUDA VISIBLE DEVICES'] = '2'
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -50,7 +50,8 @@ class Conv2d_mvm_function(Function):
     # +--------------------------+
     # |            MVM           |   
     # +--------------------------+
-    def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True):
+    def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1,
+                input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True):
        
         ## fixed-16: 
         ## sign     : 1 
@@ -77,16 +78,16 @@ class Conv2d_mvm_function(Function):
         weight_channels_in = weight.shape[1]
         weight_row = weight.shape[2]
         weight_col = weight.shape[3]
-
         # weight_pos = torch.where
         length = weight_channels_in * weight_row * weight_col
         flatten_weight = torch.zeros(2, weight_channels_out, length).to(device)     ## W+ / W-
+    
 #        self.register_buffer('flatten_weight', torch.zeros(2, weight_channels_out, length))
-        weight = weight.reshape((weight_channels_out, length))
-        flatten_weight[0] = torch.clamp(weight, min=0)  ## flatten weights
-        flatten_weight[1] = torch.clamp(weight, max=0).abs()
-        pos_bit_slice_weight = bit_slicing(flatten_weight[0], weight_bit_frac, bit_slice, weight_bits, device).to(device) ## v2: flatten weights --> fixed point --> bit slice -- v1
-        neg_bit_slice_weight = bit_slicing(flatten_weight[1], weight_bit_frac, bit_slice, weight_bits, device).to(device) 
+        weight_temp = weight.reshape((weight_channels_out, length))
+        flatten_weight[0] = torch.clamp(weight_temp, min=0)  ## flatten weights
+        flatten_weight[1] = torch.clamp(weight_temp, max=0).abs()
+        pos_bit_slice_weight = bit_slicing(flatten_weight[0], weight_bit_frac, bit_slice, weight_bits).to(device) ## v2: flatten weights --> fixed point --> bit slice -- v1
+        neg_bit_slice_weight = bit_slicing(flatten_weight[1], weight_bit_frac, bit_slice, weight_bits).to(device) 
 
 #        print(flatten_bit_slice_weight)
         # bitsliced weight into 128x128 xbars 
@@ -134,6 +135,8 @@ class Conv2d_mvm_function(Function):
         xbars_col = xbars.shape[2]
         
         zero_mvmtensor = torch.zeros(input_batch*num_pixel, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num).to(device)
+        
+
         shift_add_bit_stream = torch.zeros(bit_stream_num) # input bits = 16
         for i in range(bit_stream_num):
             shift_add_bit_stream[i] = 2**(bit_stream*i)
@@ -142,7 +145,7 @@ class Conv2d_mvm_function(Function):
         for i in range(bit_slice_num):
             shift_add_bit_slice[-i-1] = 2**(bit_slice*i)        
 #        pdb.set_trace()
-        Gon = 1/100
+        Gon = 1/100       # mS
         Goff = 1/600
         Nstates_slice = 2**bit_slice-1        
         if bit_stream ==1:
@@ -153,7 +156,7 @@ class Conv2d_mvm_function(Function):
             if ind == True:
                 output_analog = torch.zeros(input_batch*num_pixel, xbars_row, xbars_col, XBAR_COL_SIZE).to(device)
                 Goffmat = Goff*torch.ones(input_batch*num_pixel, xbars_row, 1, XBAR_ROW_SIZE, 1).to(device)
-                G_real0 = (xbars[0]*(Gon - Goff)/Nstates_slice + Goff)
+                G_real0 = (xbars[0]*(Gon - Goff)/Nstates_slice + Goff) # scaling to Gon to Goff range
                 G_real_scaled0 = (G_real0-Goff)/(Gon-Goff)                
                 G_real_flatten0 = G_real_scaled0.permute(0,1,3,2).reshape(xbars_row,xbars_col,XBAR_ROW_SIZE*XBAR_COL_SIZE).to(device)
                 G_real_flatten0 = G_real_flatten0.unsqueeze(3).expand(input_batch*num_pixel, xbars_row,xbars_col, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1).to(device)
@@ -204,7 +207,7 @@ class Conv2d_mvm_function(Function):
                     flatten_input_sign_xbar = flatten_input_sign_temp.reshape(input_batch*num_pixel, xbars.shape[1],XBAR_ROW_SIZE, bit_stream_num)
                     input_temp.abs_()
 
-                flatten_binary_input_temp = float_to_16bits_tensor_fast(input_temp, input_bit_frac, bit_stream, bit_stream_num, input_bits, device)   # batch x n x 16
+                flatten_binary_input_temp = float_to_16bits_tensor_fast(input_temp, input_bit_frac, bit_stream, bit_stream_num, input_bits)   # batch x n x 16
 #                print(flatten_binary_input_temp)
                 flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
                 
@@ -215,10 +218,10 @@ class Conv2d_mvm_function(Function):
                     # t1 = time.time()
                     xbars_out = mvm_tensor_ind(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten0, G_real0, 
                                                model, loop, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, 
-                                               weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
+                                               weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac) - \
                                 mvm_tensor_ind(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten1, G_real1, 
                                                model, loop, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, 
-                                               weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) 
+                                               weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac) 
                     # t2 = time.time()
                     # print('Time taken: ', t2-t1)
                 else:
@@ -288,9 +291,8 @@ class _ConvNd_mvm(nn.Module):
     __constants__ = ['stride', 'padding', 'dilation', 'groups', 'bias', 'padding_mode', 'bit_slice', 'bit_stream','weight_bits', 'weight_bit_frac','input_bits', 'input_bit_frac',
                      'adc_bit','acm_bits', 'acm_bit_frac', 'ind']
 
-    def __init__(self, in_channels, out_channels, kernel_size, stride,
-                 padding, dilation, transposed, output_padding,
-                 groups, bias, padding_mode, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, ind, loop, check_grad=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, dilation, transposed, output_padding, groups, bias, padding_mode, 
+                 bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, ind, loop, check_grad=False):
         super(_ConvNd_mvm, self).__init__()
         if in_channels % groups != 0:
             raise ValueError('in_channels must be divisible by groups')
@@ -381,8 +383,9 @@ class Linear_mvm_function(Function):
     # Note that both forward and backward are @staticmethods
     @staticmethod
     # bias is an optional argument
-    def forward(ctx, input, weight, bias=None, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True):
+    def forward(ctx, input, weight, xbmodel, bias=None, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True):
 
+        model = xbmodel
         if weight_bit_frac == -1:
             weight_bit_frac = weight_bits//4*3
         if input_bit_frac == -1:
@@ -405,8 +408,8 @@ class Linear_mvm_function(Function):
         neg_weight = torch.clamp(weight, max=0).abs()
 
 
-        pos_bit_slice_weight = bit_slicing(pos_weight, weight_bit_frac, bit_slice, weight_bits, device) ## v2: flatten weights --> fixed point --> bit slice -- v1
-        neg_bit_slice_weight = bit_slicing(neg_weight, weight_bit_frac, bit_slice, weight_bits, device) ## 
+        pos_bit_slice_weight = bit_slicing(pos_weight, weight_bit_frac, bit_slice, weight_bits) ## v2: flatten weights --> fixed point --> bit slice -- v1
+        neg_bit_slice_weight = bit_slicing(neg_weight, weight_bit_frac, bit_slice, weight_bits) ## 
 
         # bitsliced weight into 128x128 xbars 
         # xbar_row separates inputs --> results in a same column with different rows will be added later
@@ -445,7 +448,7 @@ class Linear_mvm_function(Function):
             input.abs_()
 
 #        binary_input[:,:input.shape[1]] = float_to_16bits_tensor(input, input_bit_frac, bit_stream, input_bits, device)   # batch x n x 16
-        binary_input[:,:input.shape[1]] = float_to_16bits_tensor_fast(input, input_bit_frac, bit_stream, bit_stream_num, input_bits, device)   # batch x n x 16
+        binary_input[:,:input.shape[1]] = float_to_16bits_tensor_fast(input, input_bit_frac, bit_stream, bit_stream_num, input_bits)   # batch x n x 16
 
         binary_input = binary_input.reshape((input_batch, xbars.shape[1], XBAR_ROW_SIZE, bit_stream_num))
         
@@ -501,10 +504,10 @@ class Linear_mvm_function(Function):
         if ind == True:
             xbars_out = mvm_tensor_ind(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten0, G_real0, 
                                        model, loop, binary_input, input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, 
-                                       input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device) - \
+                                       input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac) - \
                         mvm_tensor_ind(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten1, G_real1, 
                                        model, loop, binary_input, input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, 
-                                       input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, device)
+                                       input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac)
 
         else:
             xbars_out = mvm_tensor(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, binary_input, input_sign_xbar, bias_addr, xbars[0],
@@ -537,7 +540,7 @@ class Linear_mvm_function(Function):
         return grad_input, grad_weight, grad_bias, None, None, None, None, None, None, None, None, None, None, None 
 
 class Linear_mvm(nn.Module):
-    def __init__(self, input_features, output_features, bias=True, bit_slice = 2, bit_stream = 1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind = False, loop = True):
+    def __init__(self, input_features, output_features, xbmodel, bias=True, bit_slice = 2, bit_stream = 1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind = False, loop = True):
         super(Linear_mvm, self).__init__()
         self.input_features = input_features
         self.output_features = output_features
@@ -560,10 +563,12 @@ class Linear_mvm(nn.Module):
         self.acm_bit_frac = acm_bit_frac
         self.ind = ind
         self.loop = loop
+        self.xbmodel = xbmodel
+        self.xbmodel.load_state_dict(torch.load(pretrained_model_path)['state_dict'])
 
     def forward(self, input):
         # See the autograd section for explanation of what happens here.
-        return Linear_mvm_function.apply(input, self.weight, self.bias, self.bit_slice, self.bit_stream, self.weight_bits, self.weight_bit_frac, self.input_bits, self.input_bit_frac, self.adc_bit, self.acm_bits, self.acm_bit_frac, self.ind, self.loop)
+        return Linear_mvm_function.apply(input, self.weight, self.xbmodel, self.bias, self.bit_slice, self.bit_stream, self.weight_bits, self.weight_bit_frac, self.input_bits, self.input_bit_frac, self.adc_bit, self.acm_bits, self.acm_bit_frac, self.ind, self.loop)
 
     def extra_repr(self):
         # (Optional)Set the extra information about this module. You can test
