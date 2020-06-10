@@ -56,7 +56,7 @@ def slicing(weight, n_bit): # version 2
     return weight
 
 # fix bit_slicing to 2 bit --> later make it variable
-def bit_slicing(weight, frac_bit, bit_slice, weight_bits, device):  # version 2
+def bit_slicing(weight, frac_bit, bit_slice, weight_bits):  # version 2
 
     #assume positive
     # weight.shape[0] is output channels + 1 (bias)
@@ -93,7 +93,7 @@ def bit_slicing(weight, frac_bit, bit_slice, weight_bits, device):  # version 2
 #    del max_weight, min_weight
 
     return bitslice
-def float_to_16bits_tensor_fast(input, frac_bits, bit_slice, bit_slice_num, input_bits, device): # input is batch x n tensor / output is n x 16 tensor..
+def float_to_16bits_tensor_fast(input, frac_bits, bit_slice, bit_slice_num, input_bits): # input is batch x n tensor / output is n x 16 tensor..
     
     int_bit = input_bits - frac_bits -1 # extra -1 for sign bit
     #clamp data into the available range
@@ -151,7 +151,7 @@ def float_to_16bits_tensor(input, frac_bit, bit_stream, input_bits, device): # i
     return bit_slice
 
 def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, flatten_input, flatten_input_sign, bias_addr, 
-               xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bit, acm_bit_frac, device):   # version 2
+               xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bit, acm_bit_frac):   # version 2
 #def mvm_tensor(flatten_input, flatten_input_sign, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bit, acm_bit_frac, device):   # version 2
  
     # xbars shape:          [xbars_row, xbars_col, XBAR_ROW_SIZE, XBAR_COL_SIZE]
@@ -236,7 +236,9 @@ def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, fla
 
     return output
 
-def mvm_tensor_ind(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten, G_real, model, loop, flatten_input, flatten_input_sign, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bit, acm_bit_frac, device):  #### These should be 'almost' completely changed. 
+def mvm_tensor_ind(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten, G_real, model, loop, flatten_input,
+                   flatten_input_sign, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bit, 
+                   acm_bit_frac):  #### These should be 'almost' completely changed. 
 
     # xbars shape:          [xbars_row, xbars_col, XBAR_ROW_SIZE, XBAR_COL_SIZE]
     # flatten_input shape:  [batch_size, xbars_row, XBAR_ROW_SIZE, 16]
@@ -466,7 +468,7 @@ def mvm_tensor_ind(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg,
 #            G_real_flatten = G_real_flatten.unsqueeze(3).expand(batch_size, xbars_row,xbars_col, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1).to(device)
             output_real_out= torch.mul(G_real, V_real_loop)
             output_real_out = torch.sum(output_real_out,4)
-            output_bias_all = torch.sum(torch.mul(Goffmat,V_real_loop),4).unsqueeze(4).expand(2,batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1).to(device)
+            output_bias_all = torch.sum(torch.mul(Goffmat,V_real_loop),4).unsqueeze(4).expand(2,batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1)#.to(device)
 
             for xsign in range(2):
                 if loop == True:
