@@ -10,7 +10,7 @@ import numpy as np
 from mvm_v2 import *
 
 import time
-os.environ['CUDA_VISIBLE_DEVICES']='1'
+os.environ['CUDA_VISIBLE_DEVICES']='0'
 torch.set_printoptions(threshold=10000)
 
 # Custom conv2d formvm function: Doesn't work for back-propagation
@@ -387,8 +387,8 @@ class Linear_mvm_function(Function):
 class Linear_mvm(nn.Module):
     def __init__(self, input_features, output_features, bias=True, bit_slice = 2, bit_stream = 1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind = False, loop = True):
         super(Linear_mvm, self).__init__()
-        self.input_features = input_features
-        self.output_features = output_features
+        self.in_features = input_features
+        self.out_features = output_features
         
         self.weight = nn.Parameter(torch.Tensor(output_features, input_features))
         if bias:
