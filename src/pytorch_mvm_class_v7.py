@@ -85,9 +85,9 @@ class Conv2d_mvm_function(Function):
         flatten_weight = torch.zeros(2, weight_channels_out, length).to(device)     ## W+ / W-
     
 #        self.register_buffer('flatten_weight', torch.zeros(2, weight_channels_out, length))
-        weight = weight.reshape((weight_channels_out, length))
-        flatten_weight[0] = torch.clamp(weight, min=0)  ## flatten weights
-        flatten_weight[1] = torch.clamp(weight, max=0).abs()
+        weight_temp = weight.reshape((weight_channels_out, length))
+        flatten_weight[0] = torch.clamp(weight_temp, min=0)  ## flatten weights
+        flatten_weight[1] = torch.clamp(weight_temp, max=0).abs()
         pos_bit_slice_weight = bit_slicing(flatten_weight[0], weight_bit_frac, bit_slice, weight_bits).to(device) ## v2: flatten weights --> fixed point --> bit slice -- v1
         neg_bit_slice_weight = bit_slicing(flatten_weight[1], weight_bit_frac, bit_slice, weight_bits).to(device) 
 
@@ -242,7 +242,8 @@ class Conv2d_mvm_function(Function):
 #                out = out.reshape(tile_row, tile_col, input_batch, -1)
 #                out = out.permute(2, 3, 0, 1)  
 #                output[:,:,i*tile_row:(i+1)*tile_row,j*tile_col:(j+1)*tile_col] = out
-                output[:,:,i*tile_row:(i+1)*tile_row,j*tile_col:(j+1)*tile_col] = xbars_out.reshape(tile_row, tile_col, input_batch, -1).permute(2,3,0,1)  ## #batchsize, # o/p channels, tile_row, tile_col 
+#                pdb.set_trace()
+                output[:,:,i*tile_row:(i+1)*tile_row,j*tile_col:(j+1)*tile_col] = xbars_out.reshape(tile_row, tile_col, input_batch, -1).permute(2,3,0,1)[:,:weight_channels_out,:,:]  ## #batchsize, # o/p channels, tile_row, tile_col 
                 
 #        print(output)
 #        pdb.set_trace()
