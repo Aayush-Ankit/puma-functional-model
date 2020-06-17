@@ -82,7 +82,7 @@ class resnet(nn.Module):
         # t1 = time.time()
         # print('Time taken: ',t1-t)
         x = self.conv1(x)
-        print('Conv1', torch.mean(abs(x)))
+#        print('Conv1', torch.mean(abs(x)))
         # input()
         x = self.bn1(x)
         x = self.relu1(x)
@@ -398,7 +398,7 @@ class ResNet_cifar100(resnet):
         self.avgpool=nn.AvgPool2d(8)
         self.bn20= nn.BatchNorm1d(64*self.inflate)
         self.fc=nn.Linear(64*self.inflate,num_classes, bias = False)
-        self.bn21= nn.BatchNorm1d(100)
+        self.bn21= nn.BatchNorm1d(num_classes)
         self.logsoftmax=nn.LogSoftmax()
 
         #        #print(self.linear.weight.data.shape)
