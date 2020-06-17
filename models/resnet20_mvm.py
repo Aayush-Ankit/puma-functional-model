@@ -8,14 +8,14 @@ from src.pytorch_mvm_class_v7 import *
 __all__ = ['resnet20_mvm']
 
 class NN_model(nn.Module):
-    def __init__(self):
+    def __init__(self, N):
          super(NN_model, self).__init__()
          # N=64
-         self.fc1 = nn.Linear(4160, 500)
+         self.fc1 = nn.Linear(N**2+N, 500)
          # self.bn1 = nn.BatchNorm1d(500)
          self.relu1 = nn.ReLU(inplace=True)
          self.do2 = nn.Dropout(0.5)
-         self.fc3 = nn.Linear(500,64)
+         self.fc3 = nn.Linear(500,N)
     def forward(self, x):
         x = x.view(x.size(0), -1)
         out = self.fc1(x)
@@ -346,14 +346,16 @@ class ResNet_cifar100(resnet):
         wbit_frac = 12   
         ibit_frac = 12
         bit_slice_in = 2
-        bit_stream_in = 4
+        bit_stream_in = 1
         wbit_total = 16
         ibit_total = 16
         loop = False
+        xb_size = 128
         print('------bit slice: {} ----- bit stream: {}'.format(bit_slice_in, bit_stream_in))
         print('------wbit frac: {}------ ibit frac:  {}'.format(wbit_frac, ibit_frac))
         pretrained_model_path = 'final_64x64_mlp2layer_xbar_64x64_100_all_v2_dataset_500_100k_standard_sgd.pth.tar'
-        xbmodel = NN_model()
+        pretrained_model_path = 'xb_models/XB_'+str(xb_size)+'_stream1slice2.pth.tar'
+        xbmodel = NN_model(xb_size)
         
         self.conv1=Conv2d_mvm(3,16*self.inflate, xbmodel, pretrained_model_path, kernel_size=3, stride=1, padding=1, bias=False, bit_slice=bit_slice_in, bit_stream=bit_stream_in,
                               weight_bits=wbit_total, weight_bit_frac=wbit_frac, input_bits=ibit_total, input_bit_frac=ibit_frac, adc_bit=14, acm_bits=32, 
