@@ -51,14 +51,13 @@ class Conv2d_mvm_function(Function):
     # |            MVM           |   
     # +--------------------------+
     def forward(ctx, input, weight, xbmodel, bias=None, stride=1, padding=0, dilation=1, groups=1, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1,
-                input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True):
+                input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True, tile_row=2, tile_col=2):
        
         model = xbmodel
         ## fixed-16: 
         ## sign     : 1 
         ## integer  : 3
         ## fraction : 12
-        tile_row , tile_col = 8,8
         num_pixel = tile_row*tile_col
         if weight_bit_frac == -1:
             weight_bit_frac = weight_bits//4*3
@@ -287,7 +286,7 @@ class Conv2d_mvm_function(Function):
         if bias is not None and ctx.needs_input_grad[2]:
             grad_bias = grad_output.sum((0,2,3)).squeeze(0)
             
-        return grad_input, grad_weight, grad_bias, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None 
+        return grad_input, grad_weight, grad_bias, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None 
 
 
 class _ConvNd_mvm(nn.Module):
@@ -296,7 +295,7 @@ class _ConvNd_mvm(nn.Module):
                      'adc_bit','acm_bits', 'acm_bit_frac', 'ind']
 
     def __init__(self, in_channels, out_channels, xbmodel, pretrained_model_path, kernel_size, stride, padding, dilation, transposed, output_padding, groups, bias, padding_mode, 
-                 bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, ind, loop, check_grad=False):
+                 bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, ind, loop, tile_row, tile_col, check_grad=False):
         super(_ConvNd_mvm, self).__init__()
         if in_channels % groups != 0:
             raise ValueError('in_channels must be divisible by groups')
@@ -325,6 +324,8 @@ class _ConvNd_mvm(nn.Module):
         self.loop = loop
         self.xbmodel = xbmodel
         self.xbmodel.load_state_dict(torch.load(pretrained_model_path)['state_dict'])
+        self.tile_row = tile_row
+        self.tile_col = tile_col
 
         if check_grad:
             tensor_constructor = torch.DoubleTensor # double precision required to check grad
@@ -368,7 +369,8 @@ class _ConvNd_mvm(nn.Module):
 
 class Conv2d_mvm(_ConvNd_mvm):
     def __init__(self, in_channels, out_channels, xbmodel, pretrained_model_path, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros', check_grad=False, bit_slice=2, bit_stream=1,
-                 weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True):
+                 weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, ind=False, loop = True, tile_row=2,
+                 tile_col=2):
         kernel_size = _pair(kernel_size)
         stride = _pair(stride)
         padding = _pair(padding)
@@ -376,12 +378,13 @@ class Conv2d_mvm(_ConvNd_mvm):
 
         super(Conv2d_mvm, self).__init__(
             in_channels, out_channels, xbmodel, pretrained_model_path, kernel_size, stride, padding, dilation,
-            False, _pair(0), groups, bias, padding_mode, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, ind, loop)
+            False, _pair(0), groups, bias, padding_mode, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, 
+            acm_bit_frac, ind, loop, tile_row, tile_col)
     #@weak_script_method
     def forward(self, input):
             return Conv2d_mvm_function.apply(input, self.weight, self.xbmodel, self.bias, self.stride, self.padding, self.dilation, self.groups, self.bit_slice, self.bit_stream, 
                                              self.weight_bits, self.weight_bit_frac, self.input_bits, self.input_bit_frac, self.adc_bit, self.acm_bits, 
-                                             self.acm_bit_frac, self.ind, self.loop)
+                                             self.acm_bit_frac, self.ind, self.loop, self.tile_row, self.tile_col)
 
 
 class Linear_mvm_function(Function):
