@@ -210,7 +210,6 @@ if __name__=='__main__':
     #
 
 
-    print('worker:',args.workers)
     print('==> building model',args.arch,'...')
     if args.arch == 'vgg' or 'resnet20':
         #print(models.__dict__)
@@ -235,7 +234,6 @@ if __name__=='__main__':
     running_mean = []
     running_var = []
     num_batches = []
-#    pdb.set_trace()
     if not args.pretrained:
         for m in model.modules():
             
@@ -277,8 +275,7 @@ if __name__=='__main__':
     i=0
     j=0
     k=0
-#    pdb.set_trace()
-#    print(model_mvm)
+
     for m in model_mvm.modules():
         
       #  print (m)for m in model.modules():
