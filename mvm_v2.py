@@ -347,71 +347,88 @@ def mvm_tensor_ind(model, loop, flatten_input, flatten_input_sign, bias_addr, xb
             # V_real_scaled = (V_real-inmin_V)/(inmax_V-inmin_V)
             V_real_loop = V_real[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
             V_real_scaled_loop = V_real_scaled[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
-            output_bias_all = torch.sum(torch.mul(Goffmat,V_real_loop),3).unsqueeze(3).expand(batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1)
+            output_bias_all = torch.sum(torch.mul(Goffmat,V_real_loop),3).unsqueeze(3).expand(batch_size, xbars_row, 1, XBAR_COL_SIZE, 1)
             G_real_flatten = G_real_scaled.permute(0,1,3,2).reshape(xbars_row,xbars_col,XBAR_ROW_SIZE*XBAR_COL_SIZE)
             G_real_flatten = G_real_flatten.unsqueeze(3).expand(batch_size, xbars_row,xbars_col, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1)
             output_real_out= torch.mul(G_real, V_real_loop)
             output_real_out = torch.sum(output_real_out,3)
-            for xrow in range(xbars_row):
-                for xcol in range(xbars_col):
-                    # ----- Put your own function here -----
-                    #input_t = input_1bit[:,xrow,0].t()
-                    #output_analog_xbar = input_t.mm(xbars[xrow, xcol]) #edit IC
-                    
-                    #----------------V, G Conversion Start--------------------
-                    #t1 = time.time()
-                    #output_real = torch.mul(G_real[xrow,xcol], V_real[xsign, :, xrow, 0])
-                    #output_real = torch.sum(output_real,1)
-                    output_real = output_real_out[:,xrow,xcol]
-                    # G_real_flatten2 = G_real[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_COL_SIZE)
-                    # V_real_flatten2 = V_real[xsign, :, xrow, 0].view(batch_size, XBAR_ROW_SIZE)
-                    # with open('dataset_V_out.txt','a') as f:
-                    #     np.savetxt(f,V_real_flatten2.cpu().numpy(), delimiter=',')
-                    # with open('dataset_G_out.txt','a') as f:
-                    #     np.savetxt(f,G_real_flatten2.cpu().numpy(), delimiter=',')
-                    #t = time.time()
-                    #G_real_flatten = G_real_scaled[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_COL_SIZE)
-                    # t1 = time.time()
-                    # print('Flatten time: ', t1-t)
-                    #G_real_flatten = G_real_flatten.unsqueeze(1).expand(batch_size, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1)
-                    # t2 = time.time()
-                    # print('Expand time: ', t2-t1)
-                    #input_VG = []
-                    # input_VG[:,xrow,xcol,:] = torch.cat((G_real_flatten[:,xrow,xcol], V_real_scaled[xsign, :, xrow, 0]),1)
-                    input_VG = torch.cat((G_real_flatten[:,xrow,xcol], V_real_scaled_loop[:, xrow, 0]),1)
-                    
-                    # # t3 = time.time()
-                    # # print('Cat time: ', t3-t2)
-                    output_niratio = model(input_VG)
-                    # # t4 = time.time()
-                    # # print('model time: ', t4-t3)
-                    output_niratio_unscale = (output_niratio) * (inmax_test - inmin_test )  + inmin_test
-                    # # t5 = time.time()
-                    # # print('Unscale time: ', t5-t4)
-                    
-                    # t6 = time.time()
-                    # print('Vector divide time: ', t6-t5)
-                    #output_niratio_unscale = 1.05*torch.ones(output_niratio_unscale.shape[0], output_niratio_unscale.shape[1])
-                    # print(torch.mean(abs(output_niratio_unscale)))
-                    #output_bias = torch.mul(Goffmat,V_real[:,xrow,0])
-                    output_bias = output_bias_all[:, xrow, 0].view(batch_size,XBAR_ROW_SIZE)
-                    #output_nonideal = (output_real).div((output_niratio_unscale-0.36))-output_bias/torch.mean(output_niratio_unscale-0.36)
-                    #output_niratio_unscale2 = torch.FloatTensor(output_niratio_unscale.shape[0], output_niratio_unscale.shape[1]).normal_(1.4, 0.025).to(device)
-                    output_nonideal = (output_real-output_bias).div(output_niratio_unscale)
-                    # plt.figure(1)
-                    # plt.hist(output_niratio_unscale2.cpu().numpy())
-                   
-                    # # plt.figure(2)
-                    # # plt.hist(output_niratio_unscale.cpu().numpy())
-                    # # plt.show()
-                    # output_analog_xbar_real2 = ((output_real-output_bias)*Comp_factor)
-                    output_analog_xbar_real = ((output_nonideal)*Comp_factor)
-                    # print('bit_stream_num = ', i, 'xsign = ', xsign, 'xrow = ', xrow, 'xcol = ', xcol, torch.mean(abs(output_analog_xbar_real-output_analog_xbar_real2)))
-                    #output_analog_xbar_real2 = ((output_nonideal2)*Comp_factor)
+            if loop == True:
+                for xrow in range(xbars_row):
+                    for xcol in range(xbars_col):
+                        # ----- Put your own function here -----
+                        #input_t = input_1bit[:,xrow,0].t()
+                        #output_analog_xbar = input_t.mm(xbars[xrow, xcol]) #edit IC
+                        
+                        #----------------V, G Conversion Start--------------------
+                        #t1 = time.time()
+                        #output_real = torch.mul(G_real[xrow,xcol], V_real[xsign, :, xrow, 0])
+                        #output_real = torch.sum(output_real,1)
+                        output_real = output_real_out[:,xrow,xcol]
+                        # G_real_flatten2 = G_real[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_COL_SIZE)
+                        # V_real_flatten2 = V_real[xsign, :, xrow, 0].view(batch_size, XBAR_ROW_SIZE)
+                        # with open('dataset_V_out.txt','a') as f:
+                        #     np.savetxt(f,V_real_flatten2.cpu().numpy(), delimiter=',')
+                        # with open('dataset_G_out.txt','a') as f:
+                        #     np.savetxt(f,G_real_flatten2.cpu().numpy(), delimiter=',')
+                        #t = time.time()
+                        #G_real_flatten = G_real_scaled[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_COL_SIZE)
+                        # t1 = time.time()
+                        # print('Flatten time: ', t1-t)
+                        #G_real_flatten = G_real_flatten.unsqueeze(1).expand(batch_size, XBAR_ROW_SIZE*XBAR_COL_SIZE, 1)
+                        # t2 = time.time()
+                        # print('Expand time: ', t2-t1)
+                        #input_VG = []
+                        # input_VG[:,xrow,xcol,:] = torch.cat((G_real_flatten[:,xrow,xcol], V_real_scaled[xsign, :, xrow, 0]),1)
+                        input_VG = torch.cat((G_real_flatten[:,xrow,xcol], V_real_scaled_loop[:, xrow, 0]),1)
+                        
+                        # # t3 = time.time()
+                        # # print('Cat time: ', t3-t2)
+                        output_niratio = model(input_VG)
+                        # # t4 = time.time()
+                        # # print('model time: ', t4-t3)
+                        output_niratio_unscale = (output_niratio) * (inmax_test - inmin_test )  + inmin_test
+                        # # t5 = time.time()
+                        # # print('Unscale time: ', t5-t4)
+                        
+                        # t6 = time.time()
+                        # print('Vector divide time: ', t6-t5)
+                        #output_niratio_unscale = 1.05*torch.ones(output_niratio_unscale.shape[0], output_niratio_unscale.shape[1])
+                        # print(torch.mean(abs(output_niratio_unscale)))
+                        #output_bias = torch.mul(Goffmat,V_real[:,xrow,0])
+                        output_bias = output_bias_all[:, xrow, 0].view(batch_size,XBAR_COL_SIZE)
+                        #output_nonideal = (output_real).div((output_niratio_unscale-0.36))-output_bias/torch.mean(output_niratio_unscale-0.36)
+                        #output_niratio_unscale2 = torch.FloatTensor(output_niratio_unscale.shape[0], output_niratio_unscale.shape[1]).normal_(1.4, 0.025).to(device)
+                        output_nonideal = (output_real-output_bias).div(output_niratio_unscale)
+                        # plt.figure(1)
+                        # plt.hist(output_niratio_unscale2.cpu().numpy())
+                        
+                        # # plt.figure(2)
+                        # # plt.hist(output_niratio_unscale.cpu().numpy())
+                        # # plt.show()
+                        # output_analog_xbar_real2 = ((output_real-output_bias)*Comp_factor)
+                        output_analog_xbar_real = ((output_nonideal)*Comp_factor)
+                        # print('bit_stream_num = ', i, 'xsign = ', xsign, 'xrow = ', xrow, 'xcol = ', xcol, torch.mean(abs(output_analog_xbar_real-output_analog_xbar_real2)))
+                        #output_analog_xbar_real2 = ((output_nonideal2)*Comp_factor)
 
-                    # --------------------------------------
-                    output_analog[:, xrow, xcol] = output_analog_xbar_real
-                    # output_analog[xsign, :, xrow, xcol] = output_analog_xbar_real2
+                        # --------------------------------------
+                        output_analog[:, xrow, xcol] = output_analog_xbar_real
+                        # output_analog[xsign, :, xrow, xcol] = output_analog_xbar_real2
+            else:
+
+                V_int = V_real_scaled_loop.expand(batch_size, xbars_row, xbars_col, XBAR_ROW_SIZE,1)
+                input_VG = torch.cat((G_real_flatten, V_int), 3)
+                output_real = output_real_out.reshape(output_real_out.shape[0]*output_real_out.shape[1]*output_real_out.shape[2], output_real_out.shape[3])
+                input_VG_flatten = input_VG.reshape(input_VG.shape[0]*input_VG.shape[1]*input_VG.shape[2], input_VG.shape[3])
+                output_niratio = model(input_VG_flatten)
+                output_niratio_unscale = (output_niratio) * (inmax_test - inmin_test )  + inmin_test
+
+                # pdb.set_trace()
+                output_bias = output_bias_all.expand(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE, 1).reshape(batch_size*xbars_row*xbars_col,XBAR_COL_SIZE)
+                output_analog_xbar = (output_real-output_bias).div(output_niratio_unscale)
+                
+                output_analog = torch.stack(torch.split(((output_analog_xbar)*Comp_factor),batch_size,dim=0)).reshape(batch_size, xbars_row, xbars_col, XBAR_COL_SIZE)
+
+
             #output_analog = torch.mul(xbars, input_stream)
             #output_analog = torch.sum(output_analog,3)
             #####
