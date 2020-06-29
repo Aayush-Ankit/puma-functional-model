@@ -323,7 +323,7 @@ class _ConvNd_mvm(nn.Module):
         self.ind = ind
         self.loop = loop
         self.xbmodel = xbmodel
-        self.xbmodel.load_state_dict(torch.load(pretrained_model_path)['state_dict'])
+        #self.xbmodel.load_state_dict(torch.load(pretrained_model_path)['state_dict'])
         self.tile_row = tile_row
         self.tile_col = tile_col
 
@@ -573,7 +573,7 @@ class Linear_mvm(nn.Module):
         self.ind = ind
         self.loop = loop
         self.xbmodel = xbmodel
-        self.xbmodel.load_state_dict(torch.load(pretrained_model_path)['state_dict'])
+        #self.xbmodel.load_state_dict(torch.load(pretrained_model_path)['state_dict'])
 
     def forward(self, input):
         # See the autograd section for explanation of what happens here.
