@@ -10,7 +10,6 @@ import numpy as np
 from src.mvm_v2 import *
 
 import time
-os.environ['CUDA_VISIBLE_DEVICES']='1'
 torch.set_printoptions(threshold=10000)
 
 # Custom conv2d formvm function: Doesn't work for back-propagation
@@ -37,7 +36,7 @@ class NN_model(nn.Module):
         # out = self.do2(out)
         out = self.fc3(out)
         return out
-#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = NN_model()
 model.cuda() 
 model.eval()

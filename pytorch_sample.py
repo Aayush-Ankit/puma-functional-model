@@ -1,3 +1,5 @@
+import os
+os.environ['CUDA_VISIBLE_DEVICES']= '0'
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -5,10 +7,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import sys
+import os
 
 #from pytorch_mvm_class_v2 import *
-from pytorch_mvm_class_v2 import *
-os.environ['CUDA_VISIBLE_DEVICES']= '2'
+from src.pytorch_mvm_class_v2 import *
+
 ## To Indranil & Mustafa: This is for using 'for loops' in mvm_tensor. Just execute with '-i' at command line
 ind = False
 for i in range(len(sys.argv)):
@@ -22,7 +25,7 @@ labels = torch.tensor([1, 1])
 weights = torch.tensor([[[[-2.,1],[-1,2]],[[-4,2],[0,1]],[[-1,0],[-3,-2]]],[[[2.,1],[1,2]],[[3,2],[1,1]],[[1,2],[3,2]]]])/10
 trainloader = [[inputs, labels]]
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=32, shuffle=True, num_workers=4)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=512, shuffle=True, num_workers=4)
 inputs, labels = next(iter(trainloader))
 #trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform =transforms.Compose([transforms.ToTensor()]))
 #trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=4)
@@ -42,11 +45,11 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.conv1 = nn.Conv2d(3,512,3, bias=False, stride =1 )
-        self.conv2 = nn.Conv2d(512,512,3, bias=False, stride =2 )
-        self.conv3 = nn.Conv2d(512,512,3, bias=False, stride =2 )
+        self.conv1 = nn.Conv2d(3,64,3, bias=False, stride =1 )
+        self.conv2 = nn.Conv2d(64,64,3, bias=False, stride =2 )
+        self.conv3 = nn.Conv2d(64,64,3, bias=False, stride =2 )
         self.avgpool = nn.AvgPool2d(6)
-        self.linear = nn.Linear(512,10, bias = False)
+        self.linear = nn.Linear(64,10, bias = False)
         #print(self.linear.weight.data.shape)
         #self.linear.weight.data = torch.clone(weights_lin)
 
@@ -134,12 +137,12 @@ result_net, conv1_out,conv2_out, conv3_out = net(inputs)
 
 #torch.cuda.synchronize()
 end = time.time()
-print(end-begin)
+print('time for net:',end-begin)
 result_mynet, conv1_out_mvm, conv2_out_mvm, conv3_out_mvm = mynet(inputs)
 
 #torch.cuda.synchronize()
 end2 = time.time()
-print(end2-end)
+print('time for mynet:',end2-end)
 
 
 print(result_net[0])

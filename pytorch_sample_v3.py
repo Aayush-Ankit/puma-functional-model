@@ -1,3 +1,5 @@
+import os
+os.environ['CUDA_VISIBLE_DEVICES']= '1'
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -10,6 +12,7 @@ import torch.backends.cudnn as cudnn
 import numpy as np
 import random
 from src.pytorch_mvm_class_v3 import *
+import pdb
 
 manual_seed=0
 torch.manual_seed(manual_seed) 
@@ -20,7 +23,6 @@ os.environ['PYTHONHASHSEED'] = str(manual_seed)
 cudnn.deterministic = True 
 cudnn.benchmark = False 
 
-os.environ['CUDA_VISIBLE_DEVICES']= '0'
 
 ## To Indranil & Mustafa: This is for using 'for loops' in mvm_tensor. Just execute with '-i' at command line
 ind = False
@@ -55,9 +57,9 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.conv1 = nn.Conv2d(3,512,3, bias=False, stride =1 )
-        self.conv2 = nn.Conv2d(512,512,3, bias=False, stride =2 )
-        self.conv3 = nn.Conv2d(512,512,3, bias=False, stride =2 )
+        self.conv1 = nn.Conv2d(3,512,3, bias=False, stride =1, padding=1)
+        self.conv2 = nn.Conv2d(512,512,3, bias=False, stride =2, padding=1)
+        self.conv3 = nn.Conv2d(512,512,3, bias=False, stride =2, padding=1)
         self.avgpool = nn.AvgPool2d(6)
         self.linear = nn.Linear(512,10, bias = False)
         #print(self.linear.weight.data.shape)
@@ -86,9 +88,9 @@ class my_Net(nn.Module):
     def __init__(self):
         super(my_Net, self).__init__()
 
-        self.conv1 = nn.Conv2d(3,512,3,  stride=1, padding=0, bias=False)# bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)   # --> my custom module for mvm
-        self.conv2 = Conv2d_mvm(512,512,3, stride=2, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
-        self.conv3 = Conv2d_mvm(512,512,3, stride=2, padding=0, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)
+        self.conv1 = nn.Conv2d(3,512,3,  stride=1, padding=1, bias=False)# bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=True)   # --> my custom module for mvm
+        self.conv2 = Conv2d_mvm(512,512,3, stride=2, padding=1, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
+        self.conv3 = Conv2d_mvm(512,512,3, stride=2, padding=1, bias=False, bit_slice=4, bit_stream=4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind=ind, loop=False)
         self.avgpool = nn.AvgPool2d(6)
         self.linear = Linear_mvm(512,10, bias=False, bit_slice = 4, bit_stream = 4, weight_bits=16, weight_bit_frac=14, input_bits=16, input_bit_frac=14, adc_bit=14, acm_bits=32, acm_bit_frac=24, ind = ind)
 
@@ -143,24 +145,24 @@ for m in net.modules():
 
 #time_net=[]
 #time_mynet=[]
-#for i in range(5):
-#    torch.cuda.synchronize()
+#for i in range(3):
 #    begin = time.time()
+#    print('net:')
 #    result_net, conv1_out,conv2_out, conv3_out = net(inputs)
 #    
-#    torch.cuda.synchronize()
 #    end = time.time()
 #    time_net.append(end-begin)
+#    print('mynet:')
 #    result_mynet, conv1_out_mvm, conv2_out_mvm, conv3_out_mvm = mynet(inputs)
 #    
-#    torch.cuda.synchronize()
 #    end2 = time.time()
 #    time_mynet.append(end2-end)
+##    torch.cuda.empty_cache()
 #    
 #print('net average: ',sum(time_net)/len(time_net))
 #
 #print('mynet average: ',sum(time_mynet)/len(time_mynet))
-#
+
 begin = time.time()
 result_net, conv1_out,conv2_out, conv3_out = net(inputs)
 
