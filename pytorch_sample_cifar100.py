@@ -1,3 +1,5 @@
+import os
+os.environ['CUDA_VISIBLE_DEVICES']= '0'
 
 
 import torch
@@ -9,14 +11,25 @@ import torch.optim as optim
 import sys
 import pdb
 import models
-from pytorch_mvm_class_v2 import *
+from src.pytorch_mvm_class_v7 import *
 import os
 import argparse
 from data import get_dataset
 from preprocess import get_transform
 from utils import *
 from torchvision.utils import save_image
-os.environ['CUDA_VISIBLE_DEVICES']= '1'
+import numpy as np
+import random
+
+
+new_manual_seed = 0
+torch.manual_seed(new_manual_seed)
+torch.cuda.manual_seed_all(new_manual_seed)
+np.random.seed(new_manual_seed)
+torch.backends.cudnn.deterministic = True  
+torch.backends.cudnn.benchmark = False     
+random.seed(new_manual_seed)
+os.environ['PYTHONHASHSEED'] = str(new_manual_seed)
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -55,7 +68,7 @@ def test():
         data_var = torch.autograd.Variable(data.cuda(), volatile=True)
         target_var = torch.autograd.Variable(target, volatile=True)
 
-                                    
+                                 
         output = model(data_var)
         loss= criterion(output, target_var)
         prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
@@ -96,7 +109,7 @@ def test():
     # print('Best Accuracy: {:.2f}%\n'.format(best_acc))
     return acc, losses.avg
 
-def test_mvm():
+def test_mvm(device):
     global best_acc
     flag = True
     training = False
@@ -105,16 +118,18 @@ def test_mvm():
     top1 = AverageMeter()
     top5 = AverageMeter()
 
+    tstart=time.time()
     for batch_idx,(data, target) in enumerate(testloader):
-        target = target.cuda()
-        data_var = torch.autograd.Variable(data.cuda(), volatile=True)
-        target_var = torch.autograd.Variable(target.cuda(), volatile=True)
-
-                                    
+#        target = target.cuda()
+#        data_var = torch.autograd.Variable(data.cuda(), volatile=True)
+#        target_var = torch.autograd.Variable(target.cuda(), volatile=True)
+        data_var = data.to(device)
+        target_var = target.to(device)
+#        pdb.set_trace()
         output = model_mvm(data_var)
+#        print('input shape: ',output.shape)
         loss= criterion(output, target_var)
-
-        prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
+        prec1, prec5 = accuracy(output.data, target_var.data, training, topk=(1, 5))
         losses.update(loss.data, data.size(0))
         top1.update(prec1[0], data.size(0))
         top5.update(prec5[0], data.size(0))
@@ -134,8 +149,8 @@ def test_mvm():
                       'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                        epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
                        loss=losses, top1=top1, top5=top5))
-        # if batch_idx == 10:
-        #     break        
+        if batch_idx == 9:
+             break        
 
     acc = top1.avg
  
@@ -146,7 +161,8 @@ def test_mvm():
 
     print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
           .format(top1=top1, top5=top5))
-
+    tend=time.time()
+    print('Time taken for {} batches:{}'.format(batch_idx+1, tend-tstart))
     # print('Best Accuracy: {:.2f}%\n'.format(best_acc))
     return acc, losses.avg
 
@@ -194,7 +210,6 @@ if __name__=='__main__':
     #
 
 
-
     print('==> building model',args.arch,'...')
     if args.arch == 'vgg' or 'resnet20':
         #print(models.__dict__)
@@ -204,10 +219,12 @@ if __name__=='__main__':
     else:
         raise Exception(args.arch+' is currently not supported')
 
-
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print('DEVICE:',device)
     model = model()
     model_mvm = models.__dict__['resnet20_mvm']
     model_mvm = model_mvm(ind)
+  
 
     print('==> Initializing model parameters ...')
     weights_conv = []
@@ -217,7 +234,6 @@ if __name__=='__main__':
     running_mean = []
     running_var = []
     num_batches = []
-
     if not args.pretrained:
         for m in model.modules():
             
@@ -259,10 +275,11 @@ if __name__=='__main__':
     i=0
     j=0
     k=0
+
     for m in model_mvm.modules():
         
       #  print (m)for m in model.modules():
-        if isinstance(m, Conv2d_mvm):
+        if isinstance(m, (Conv2d_mvm, nn.Conv2d)):
             m.weight.data = weights_conv[i]
             i = i+1
         #print(m.weight.data)
@@ -277,10 +294,16 @@ if __name__=='__main__':
         elif isinstance(m, Linear_mvm):
             m.weight.data = weights_lin[k]
             k=k+1
-    model.cuda()
-    model_mvm.cuda()
-    
 
+#    model.cuda()
+    model_mvm.to(device)
+    model_mvm = torch.nn.DataParallel(model_mvm)#, device_ids=[0,1])
+#    model_mvm.to(device)
+#    model_mvm.cuda()
+
+#    model_mvm.to(device)  
+
+    
     default_transform = {
         'train': get_transform(args.dataset,
                                input_size=args.input_size, augment=True),
@@ -305,10 +328,10 @@ if __name__=='__main__':
 
     if args.evaluate:
        # test()
-        test_mvm()
+        test_mvm(device)
         exit(0)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     #net.to(device)
     # mynet.to(device)
     # inputs = inputs.to(device)

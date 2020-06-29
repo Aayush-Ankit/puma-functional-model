@@ -236,9 +236,9 @@ def mvm_tensor_ind(model, loop, flatten_input, flatten_input_sign, bias_addr, xb
     Comp_factor = Nstates_slice*Nstates_stream/((Gon-Goff)*Vmax)
     inmax_V = Vmax
     inmin_V = 0
-    #100k
-    # inmax_test =    1.2
-    # inmin_test =    0.85
+#    100k
+    inmax_test =    1.2
+    inmin_test =    0.85
 
 
 
@@ -262,8 +262,8 @@ def mvm_tensor_ind(model, loop, flatten_input, flatten_input_sign, bias_addr, xb
     # inmax_test = 1.14;
     # inmin_test = 1.0856;
      #ssw
-    inmax_test = 1.14
-    inmin_test = 1.08
+#    inmax_test = 1.14
+#    inmin_test = 1.08
      #100_allpt5
     # inmax_test = 1.3;
     # inmin_test = 0.85;
