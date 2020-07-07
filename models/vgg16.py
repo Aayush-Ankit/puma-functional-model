@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 import sys
 import time
-__all__ = ['vgg']
+__all__ = ['net']
 
 
   
@@ -388,7 +388,7 @@ class VGG_cifar100(vgg16):
         #    164: {'lr': 1e-6}
         #}
 
-def vgg(**kwargs):
+def net(**kwargs):
     num_classes, depth, dataset = map(
         kwargs.get, ['num_classes', 'depth', 'dataset'])
     num_classes = 100

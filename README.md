@@ -12,17 +12,17 @@ Below you can find the system requirements and versions tested.
 
 ## Quick start
 
-`pytorch_sample.py` has a simple example inputs and weights matrix, and a simple network.
-By the command `python pytorch_sample.py`, you can run the code. 
+`test/pytorch_sample_cifar100.py` is a sample testing script for CIFAR-100 dataset.
 
-Conv2d_mvm is the custom module defined in pytorch_mvm_class.py
+`Conv2d_mvm` and `Linear_mvm` are custom layers defined in pytorch_mvm_class_vX.py for running the conv2d and linear layers with the functional simulator backend.
 
-To run with physical crossbar models, use `-i` command like:
+`models/resnet18_mvm.py` is a model specification of resnet18 that uses custom layers - conv2d_mvm and linear_mvm.
+
+To run a pretrained model:
 ```bash
-python pytorch_sample -i
+cd test
+python pytorch_sample_cifar100.py -b <batch_size> --pretrained <my_trained_model> --gpus <gpu ids>
 ```
-And then for loops in mvm_tensor will work. 
-
 
 ## Supported configuration parameters
 
