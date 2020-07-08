@@ -2,6 +2,8 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 
+if_bit_slicing = True
+
 ## Use global parameters (below) for all layers or layer specific parameters
 val = True
 ifglobal_weight_bits = val
@@ -29,8 +31,8 @@ input_bit_frac = 12
 ## Tiling configurations
 xbar_col_size = 16
 xbar_row_size = 32
-tile_col = 2
-tile_row = 2
+tile_col = 8
+tile_row = 8
 
 ## Bit-slicing configurations
 bit_stream = 1
@@ -70,7 +72,7 @@ def dump_config():
     param_dict = {'weight_bits':weight_bits, 'weight_bit_frac':weight_bit_frac, 'input_bits':input_bits, 'input_bit_frac':input_bit_frac, 
                   'xbar_row_size':xbar_row_size, 'xbar_col_size':xbar_col_size, 'tile_row':tile_row, 'tile_col':tile_col,
                   'bit_stream':bit_stream, 'bit_slice':bit_slice, 'adc_bit':adc_bit, 'acm_bits':acm_bits, 'acm_bit_frac':acm_bit_frac,
-                  'non-ideality':ind, 'xbmodel':xbmodel, 'xbmodel_weight_path':xbmodel_weight_path}
+                  'non-ideality':non_ideality, 'xbmodel':xbmodel, 'xbmodel_weight_path':xbmodel_weight_path}
 
     print("********************************************")
     print("Functional simulator configurations:")

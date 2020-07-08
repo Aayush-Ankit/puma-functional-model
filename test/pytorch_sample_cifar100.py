@@ -27,13 +27,19 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision.utils import save_image
 
+#torch.set_default_tensor_type(torch.HalfTensor)
+
 # User-defined packages
 import models
-from src.pytorch_mvm_class_v3 import *
 from utils.data import get_dataset
 from utils.preprocess import get_transform
 from utils.utils import *
 import src.config as cfg
+
+if cfg.if_bit_slicing:
+    from src.pytorch_mvm_class_v3 import *
+else:
+    from src.pytorch_mvm_class_no_bitslice import *
 
 new_manual_seed = 0
 torch.manual_seed(new_manual_seed)
@@ -126,7 +132,7 @@ def test_mvm(device):
     top5 = AverageMeter()
 
     for batch_idx,(data, target) in enumerate(testloader):
-        data_var = data.to(device)
+        data_var = data.to(device)#.half() # use commented part for FP16
         target_var = target.to(device)
         
         t_start = time.time()
@@ -244,11 +250,12 @@ if __name__=='__main__':
             m.running_var.data = running_var[j]
             m.num_batches_tracked = num_batches[j]
             j = j+1
-        elif isinstance(m, Linear_mvm):
+        #elif isinstance(m, Linear_mvm):
+        elif isinstance(m, nn.Linear):
             m.weight.data = weights_lin[k]
             k=k+1
 
-    model_mvm.to(device)
+    model_mvm.to(device)#.half() # uncomment for FP16
     model_mvm = torch.nn.DataParallel(model_mvm)
 
     default_transform = {

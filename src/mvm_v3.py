@@ -123,6 +123,7 @@ def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, fla
 
         output = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 3)
 
+        #output = output.float() # uncomment for FP16 (ops on 128, 129 fail without float)
         output.div_(2**(input_bit_frac + weight_bit_frac - acm_bit_frac)).trunc_()
         output.fmod_(2**acm_bit).div_(2**acm_bit_frac)
 
@@ -144,6 +145,7 @@ def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, fla
 
         output_split = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 4)
 
+        #output_split = output_split.float() # uncomment for FP16 (ops on 149, 150 fail without float)
         output_split.div_(2**(input_bit_frac + weight_bit_frac - acm_bit_frac)).trunc_()
         output_split.fmod_(2**acm_bit).div_(2**acm_bit_frac)
 
@@ -152,7 +154,7 @@ def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, fla
         output = output_split[0].sub(output_split[1])
 
     #del shift_add_bit_stream, shift_add_bit_slice, output_reg
-    return output
+    return output.half()
 
 def mvm_tensor_nonid(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten, G_real, model, flatten_input,
                    flatten_input_sign, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bit, 

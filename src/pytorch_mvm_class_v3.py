@@ -23,6 +23,7 @@ class Conv2d_mvm_function(Function):
     # +--------------------------+
     def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, tile_row=2, tile_col=2, xbmodel=None, xbmodel_weight_path=None):
        
+        #torch.set_default_tensor_type(torch.HalfTensor)
         ## fixed-16: 
         ## sign     : 1 
         ## integer  : 3
@@ -92,8 +93,8 @@ class Conv2d_mvm_function(Function):
         
         zero_mvmtensor = torch.zeros(input_batch*num_pixel, xbars.shape[1],cfg.xbar_row_size, bit_stream_num).to(device)
 
-        shift_add_bit_stream= torch.pow(torch.ones(bit_stream_num)*2, bit_stream*torch.arange(0,bit_stream_num).float()).to(device)
-        shift_add_bit_slice=  torch.pow(torch.ones(bit_slice_num)*2,  bit_slice*torch.arange(bit_slice_num-1, -1, -1).float()).to(device) 
+        shift_add_bit_stream= torch.pow(2*torch.ones(bit_stream_num).float(), bit_stream*torch.arange(0,bit_stream_num).float()).to(device).half()
+        shift_add_bit_slice=  torch.pow(2*torch.ones(bit_slice_num).float(),  bit_slice*torch.arange(bit_slice_num-1, -1, -1).float()).to(device).half()
         Gon = 1/100
         Goff = 1/600
         Nstates_slice = 2**bit_slice-1        
@@ -141,6 +142,10 @@ class Conv2d_mvm_function(Function):
         stride_input_col = stride[1]*tile_col
         
         # Output feature map size should be multiple of tile size
+        if (tile_row > output_row):
+            tile_row = output_row
+        if (tile_col > output_col):
+            tile_col = output_col
         assert output_row%tile_row == 0 and output_col%tile_col == 0, "Output feature map size should be multiple of tile size"
         for i in range(math.ceil(output_row/tile_row)):
             for j in range(math.ceil(output_col/tile_col)):

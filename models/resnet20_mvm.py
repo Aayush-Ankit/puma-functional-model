@@ -4,9 +4,13 @@ import torch.nn.functional as F
 import sys
 import time
 import pdb
-from src.pytorch_mvm_class_v3 import *
 
 import config as cfg
+
+if cfg.if_bit_slicing:
+    from src.pytorch_mvm_class_v3 import *
+else:
+    from src.pytorch_mvm_class_no_bitslice import *
 
 __all__ = ['net']
   
@@ -205,7 +209,8 @@ class ResNet_cifar100(resnet):
         #########Layer################ 
         self.avgpool=nn.AvgPool2d(8)
         self.bn20= nn.BatchNorm1d(64*self.inflate)
-        self.fc=Linear_mvm(64*self.inflate,num_classes, bias=False) 
+        #self.fc=Linear_mvm(64*self.inflate,num_classes, bias=False) 
+        self.fc=nn.Linear(64*self.inflate,num_classes, bias=False) 
         self.bn21= nn.BatchNorm1d(num_classes)
         self.logsoftmax=nn.LogSoftmax()
 

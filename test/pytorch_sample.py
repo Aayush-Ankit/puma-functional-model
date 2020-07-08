@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES']= '1'
+os.environ['CUDA_VISIBLE_DEVICES']= '2'
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -11,7 +11,7 @@ import os
 import torch.backends.cudnn as cudnn
 import numpy as np
 import random
-from src.pytorch_mvm_class_v3 import *
+from src.pytorch_mvm_class_no_bitslice import *
 import pdb
 
 manual_seed=0
@@ -22,13 +22,6 @@ random.seed(manual_seed)
 os.environ['PYTHONHASHSEED'] = str(manual_seed) 
 cudnn.deterministic = True 
 cudnn.benchmark = False 
-
-
-## To Indranil & Mustafa: This is for using 'for loops' in mvm_tensor. Just execute with '-i' at command line
-ind = False
-for i in range(len(sys.argv)):
-    if sys.argv[i] == '-i':
-        ind = True
 
 inputs = torch.tensor([[[[-1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]], [[[1.,0,1],[-2,1,0],[1,-2,1]],[[2,-3,1],[-2,0,-1],[4,-2,-1]],[[-3,2,1],[0,2,1],[-5,3,2]]]])/10
 #inputs = torch.tensor([[[[1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]], [[[-1.,0,1],[2,1,0],[1,2,1]],[[2,3,1],[2,0,1],[4,2,1]],[[3,2,1],[0,2,1],[5,3,2]]]])
