@@ -1,3 +1,5 @@
+### Script to evaluate models (after training)
+
 import os
 import sys
 
@@ -58,24 +60,6 @@ for path, dirs, files in os.walk(models_dir):
     break # only traverse top level directory
 model_names.sort()
 
-def accuracy(output, target, training, topk=(1,)):
-    """Computes the precision@k for the specified values of k"""
-    maxk = max(topk)
-    batch_size = target.size(0)
-
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
-    if training:
-        correct = pred.eq(target.data.view(1, -1).expand_as(pred))
-    else:
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-    res = []
-    for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
-        res.append(correct_k.mul_(100.0 / batch_size))
-    return res
-
 # Run evaluation on a model (<model>.py) without functional simulator
 def test(device):
     global best_acc
@@ -92,7 +76,7 @@ def test(device):
 
         output = model(data_var)
         loss= criterion(output, target_var)
-        prec1, prec5 = accuracy(output.data, target, training, topk=(1, 5))
+        prec1, prec5 = accuracy(output.data, target_var.data, training, topk=(1, 5))
         losses.update(loss.data, data.size(0))
         top1.update(prec1[0], data.size(0))
         top5.update(prec5[0], data.size(0))
@@ -121,54 +105,6 @@ def test(device):
     acc = top1.avg
     return acc, losses.avg
 
-# Run evaluation on a model (<model_mvm>.py) with functional simulator
-def test_mvm(device):
-    global best_acc
-    flag = True
-    training = False
-    model_mvm.eval()
-    losses = AverageMeter()
-    top1 = AverageMeter()
-    top5 = AverageMeter()
-
-    for batch_idx,(data, target) in enumerate(testloader):
-        data_var = data.to(device)#.half() # use commented part for FP16
-        target_var = target.to(device)
-        
-        t_start = time.time()
-        output = model_mvm(data_var)
-        t_end = time.time()
-        print ('Time taken for one batch', t_end-t_start)
-
-        loss= criterion(output, target_var)
-        prec1, prec5 = accuracy(output.data, target_var.data, training, topk=(1, 5))
-        losses.update(loss.data, data.size(0))
-        top1.update(prec1[0], data.size(0))
-        top5.update(prec5[0], data.size(0))
-
-        if flag == True:
-            if batch_idx % 1 == 0:
-                print('[{0}/{1}({2:.0f}%)]\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                       batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
-                       loss=losses, top1=top1, top5=top5))
-        else:
-            if batch_idx % 1 == 0:
-               print('Epoch: [{0}][{1}/{2}({3:.0f}%)]\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                       epoch, batch_idx, len(testloader), 100. *float(batch_idx)/len(testloader),
-                       loss=losses, top1=top1, top5=top5))
-        #if batch_idx == 9:
-        #     break
-    print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
-          .format(top1=top1, top5=top5))
-    acc = top1.avg
-    return acc, losses.avg
-
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-b', '--batch-size', default=512, type=int,
@@ -180,6 +116,8 @@ if __name__=='__main__':
                 help='name of the model')
     parser.add_argument('--pretrained', action='store', default=None,
         help='the path to the pretrained model')
+    parser.add_argument('--mvm', action='store_true', default=None,
+                help='if running functional simulator backend')
     parser.add_argument('--input_size', type=int, default=None,
                 help='image input size')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='J',
@@ -255,8 +193,12 @@ if __name__=='__main__':
             m.weight.data = weights_lin[k]
             k=k+1
 
-    model_mvm.to(device)#.half() # uncomment for FP16
-    model_mvm = torch.nn.DataParallel(model_mvm)
+    # Move required model to GPU (if applicable)
+    if args.mvm:
+        model = model_mvm
+    
+    model.to(device)#.half() # uncomment for FP16
+    model = torch.nn.DataParallel(model)
 
     default_transform = {
         'train': get_transform(args.dataset,
@@ -279,6 +221,5 @@ if __name__=='__main__':
 
     criterion = nn.CrossEntropyLoss()
 
-    #test(device)
-    test_mvm(device)
+    test(device)
     exit(0)

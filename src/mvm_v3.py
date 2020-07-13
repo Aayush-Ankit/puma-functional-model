@@ -154,7 +154,7 @@ def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, fla
         output = output_split[0].sub(output_split[1])
 
     #del shift_add_bit_stream, shift_add_bit_slice, output_reg
-    return output.half()
+    return output
 
 def mvm_tensor_nonid(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten, G_real, model, flatten_input,
                    flatten_input_sign, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bit, 

@@ -45,13 +45,24 @@ class Conv2d_mvm_function(Function):
         length = weight_channels_in * weight_row * weight_col
         weight_mat2d = weight.view(weight_channels_out, length).t()
         
-        # Covert 2d matrix to xbars, including padding boundary tiles with zeros
+        # Convert 2d matrix to xbars, including padding boundary tiles with zeros
         xbar_row = math.ceil(weight_mat2d.shape[0]/cfg.xbar_row_size)
         xbar_col = math.ceil(weight_mat2d.shape[1]/cfg.xbar_col_size)
         weight_xbar = torch.zeros(xbar_row*cfg.xbar_row_size, xbar_col*cfg.xbar_col_size).to(device)
         weight_xbar[:weight_mat2d.shape[0], :weight_mat2d.shape[1]] = weight_mat2d
         xbars = weight_xbar.unfold(0,cfg.xbar_row_size, cfg.xbar_row_size).unfold(1, cfg.xbar_col_size, cfg.xbar_col_size)
         assert (xbar_row == xbars.shape[0] and xbar_col == xbars.shape[1]), "xbars unfolding is incorrect"
+
+        # Collect sparsity stats of xbars, and weight matrix (after zero padding) per column
+        xbars_z = torch.zeros(xbars.shape).to(device)
+        xbars_nz = torch.ones(xbars.shape).to(device)
+        xbars_density = torch.where(xbars!=0.0, xbars_nz, xbars_z)
+        xbars_density = torch.sum(xbars_density, 2)/xbars.shape[2] #reduce across rows in one crossbar (xbar_row_size)
+
+        weight_xbar_z = xbars_z.view(weight_xbar.shape) # view creates references i.e. no memory replication
+        weight_xbar_nz = xbars_nz.view(weight_xbar.shape)
+        weight_xbar_density = torch.where(weight_xbar!=0.0, weight_xbar_nz, weight_xbar_z)
+        weight_xbar_density = torch.sum(weight_xbar_density, 0)/weight_xbar.shape[0] #reduce acorss rows of the matrix
         
         ## Format inputs: accomodate for padding/stride and then reshape to xbars
         input_batch = input.shape[0]
@@ -106,6 +117,10 @@ class Conv2d_mvm_function(Function):
         ctx.padding = padding 
         ctx.dilation = dilation
         ctx.groups = groups
+
+        # Record density stats
+        ctx.xbars_density = xbars_density
+        ctx.weight_xbar_density = weight_xbar_density
 
         return output
 
@@ -170,6 +185,10 @@ class _ConvNd_mvm(nn.Module):
         self.tile_row = cfg.tile_row if cfg.ifglobal_tile_row else tile_row
         self.xbar_col_size = cfg. xbar_col_size if cfg.ifglobal_xbar_col_size else xbar_col_size
         self.xbar_row_size = cfg. xbar_row_size if cfg.ifglobal_xbar_row_size else xbar_row_size
+
+        # Sparsity statistics collection
+        self.xbars_density = None
+        self.weight_xbar_density = None
 
         if check_grad:
             tensor_constructor = torch.DoubleTensor # double precision required to check grad

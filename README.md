@@ -7,7 +7,7 @@ Below you can find the system requirements and versions tested.
 | Requirement | Version                    |
 | ----------- | -------------------------- |
 | Python      | 3.7.3                      |
-| PyTorch      | 1.1.0                      |
+| PyTorch      | 1.1.0                     |
 
 
 ## Quick start

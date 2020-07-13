@@ -65,6 +65,7 @@ class Conv2d_mvm_function(Function):
 
         bit_slice_num = weight_bits//bit_slice
         bit_stream_num = input_bits//bit_stream
+        assert (cfg.xbar_row_size > bit_slice_num), "Attempting zero division, adjust xbar_col_size"
         bias_addr = [weight_channels_out//int(cfg.xbar_col_size/bit_slice_num), weight_channels_out%int(cfg.xbar_col_size/bit_slice_num)]      #####
 
         #xbars = weight_xbar.unfold(1,cfg.xbar_row_size, cfg.xbar_col_size).unfold(2, cfg.xbar_row_size, cfg.xbar_col_size)
@@ -93,8 +94,8 @@ class Conv2d_mvm_function(Function):
         
         zero_mvmtensor = torch.zeros(input_batch*num_pixel, xbars.shape[1],cfg.xbar_row_size, bit_stream_num).to(device)
 
-        shift_add_bit_stream= torch.pow(2*torch.ones(bit_stream_num).float(), bit_stream*torch.arange(0,bit_stream_num).float()).to(device).half()
-        shift_add_bit_slice=  torch.pow(2*torch.ones(bit_slice_num).float(),  bit_slice*torch.arange(bit_slice_num-1, -1, -1).float()).to(device).half()
+        shift_add_bit_stream= torch.pow(2*torch.ones(bit_stream_num).float(), bit_stream*torch.arange(0,bit_stream_num).float()).to(device)
+        shift_add_bit_slice=  torch.pow(2*torch.ones(bit_slice_num).float(),  bit_slice*torch.arange(bit_slice_num-1, -1, -1).float()).to(device)
         Gon = 1/100
         Goff = 1/600
         Nstates_slice = 2**bit_slice-1        

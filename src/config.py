@@ -29,10 +29,10 @@ input_bits = 16
 input_bit_frac = 12
 
 ## Tiling configurations
-xbar_col_size = 16
-xbar_row_size = 32
-tile_col = 8
 tile_row = 8
+tile_col = 8
+xbar_row_size = 32
+xbar_col_size = 16
 
 ## Bit-slicing configurations
 bit_stream = 1
@@ -74,8 +74,8 @@ def dump_config():
                   'bit_stream':bit_stream, 'bit_slice':bit_slice, 'adc_bit':adc_bit, 'acm_bits':acm_bits, 'acm_bit_frac':acm_bit_frac,
                   'non-ideality':non_ideality, 'xbmodel':xbmodel, 'xbmodel_weight_path':xbmodel_weight_path}
 
-    print("********************************************")
-    print("Functional simulator configurations:")
+    print("==> Functional simulator configurations:", end=' ')
     for key, val in param_dict.items():
-        print (key, val)
-    print("********************************************")
+        t_str = key + '=' + str(val)
+        print (t_str, end=', ')
+    print('\n')
