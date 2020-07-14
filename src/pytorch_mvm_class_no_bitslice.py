@@ -11,7 +11,7 @@ import time
 import sys
 torch.set_printoptions(threshold=10000)
 
-import config as cfg
+import src.config as cfg
 
 class Conv2d_mvm_function(Function):
 

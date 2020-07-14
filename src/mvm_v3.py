@@ -9,7 +9,7 @@ import os
 import argparse
 import pdb
 
-import config as cfg
+import src.config as cfg
 
 XBAR_ROW_SIZE = cfg.xbar_row_size
 XBAR_COL_SIZE = cfg.xbar_col_size

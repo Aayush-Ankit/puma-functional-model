@@ -5,18 +5,16 @@ import sys
 import time
 
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-test_dir = os.path.join(root_dir, "test")
-src_dir = os.path.join(root_dir, "src")
 models_dir = os.path.join(root_dir, "models")
 datasets_dir = os.path.join(root_dir, "datasets")
-metrics_dir = os.path.join(root_dir, "metrics")
+src_dir = os.path.join(root_dir, "src")
+#test_dir = os.path.join(root_dir, "test")
 
 sys.path.insert(0, root_dir) # 1 adds path to end of PYTHONPATH
 sys.path.insert(0, models_dir)
-sys.path.insert(0, test_dir) 
-sys.path.insert(0, src_dir)
 sys.path.insert(0, datasets_dir)
-sys.path.insert(0, metrics_dir)
+sys.path.insert(0, src_dir)
+#sys.path.insert(0, test_dir) 
 
 # Standard or Built-in packages
 import numpy as np
@@ -36,7 +34,7 @@ import models
 from utils.data import get_dataset
 from utils.preprocess import get_transform
 from utils.utils import *
-from metrics.sparsity import *
+from pruning.sparsity import *
 
 import src.config as cfg
 

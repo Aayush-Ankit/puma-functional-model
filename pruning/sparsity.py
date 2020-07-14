@@ -1,3 +1,5 @@
+# Definition of utility functions for sparsity - plotting, calculating metrics, validating
+
 import math
 import torch
 import numpy as np
@@ -6,23 +8,27 @@ import sys
 torch.set_printoptions(threshold=10000)
 
 import pdb
-
-import config as cfg
+import src.config as cfg
 
 def sparsity_plot (s_tuple, path="./", save=True):
-    """ Plots layer-wise histogram of sparsity
+    """ Plots layer-wise histogram of sparsity - matrix-level, xbar-level
 
     Arguments:
         s_tuple:
             - dict -- dictionary of layer-wise sparsity
             - dict -- dictionary of matrix-column wise sparsity
             - dict -- dictionary of xbar-column wise sparsity
+
+    Returns:
+        None
     """
 
     scale = 2.0
     fig = plt.figure(figsize=(8.0*scale, 5.0*scale))
     fig.suptitle("Distribution of sparsity across layers") # set global title for all sub-plots
     n = len(s_tuple[1].keys())
+
+    # Use stride to plot selected layers
     stride = 2
     n1 = math.floor(math.sqrt(n // stride))
 
@@ -116,3 +122,26 @@ def sparsity_metrics (model):
             xbar_s.update({name: xbars_sparsity.view(-1)})
 
     return layer_s, matrix_s, xbar_s
+
+def sparsity_validate (model):
+    """ Prints the global, and layer-wise sparsity of model for validation
+
+    Arguments:
+        model {torch.nn.Module}
+    
+    Returns:
+        None
+    """
+
+    global_zeros,global_elements = 0,0
+
+    for name, module in model.named_modules():
+        local_zeros,local_elements = 0,0
+        if isinstance(module, torch.nn.Conv2d):
+            local_zeros = float(torch.sum(module.weight==0.0))
+            local_elements = float(module.weight.nelement())
+            print("Sparsity in " + name + ": {:.2f}%" .format(100*local_zeros/local_elements))
+
+            global_zeros += local_zeros
+            global_elements += local_elements
+    print("Global sparsity: {:.2f}%" .format(100*global_zeros/global_elements))

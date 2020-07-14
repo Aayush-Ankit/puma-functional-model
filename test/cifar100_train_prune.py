@@ -4,16 +4,16 @@ import os
 import sys
 
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-test_dir = os.path.join(root_dir, "test")
-src_dir = os.path.join(root_dir, "src")
 models_dir = os.path.join(root_dir, "models")
 datasets_dir = os.path.join(root_dir, "datasets")
+src_dir = os.path.join(root_dir, "src")
+#test_dir = os.path.join(root_dir, "test")
 
 sys.path.insert(0, root_dir) # 1 adds path to end of PYTHONPATH
 sys.path.insert(0, models_dir)
-sys.path.insert(0, test_dir) 
-sys.path.insert(0, src_dir)
 sys.path.insert(0, datasets_dir)
+sys.path.insert(0, src_dir)
+#sys.path.insert(0, test_dir) 
 
 # Standard or Built-in packages
 import numpy as np
@@ -38,6 +38,7 @@ import models
 from utils.data import get_dataset
 from utils.preprocess import get_transform
 from utils.utils import *
+from pruning.sparsity import *
 import src.config as cfg
 
 if cfg.if_bit_slicing:
@@ -190,7 +191,7 @@ if __name__=='__main__':
     #            help='experiment name to be used for creating folder within results_dir')
     parser.add_argument('--log_freq', metavar='LOG', type=int, default=100,
                 help='frequency of loggin the result in terms of number of batches')
-    parser.add_argument('--chpt_freq', metavar='checkpoint', type=int, default=10,
+    parser.add_argument('--chpt_freq', metavar='checkpoint', type=int, default=40,
                 help='frequency of checkpointing the model in terms of number of epochs')
     
     # others
@@ -206,6 +207,8 @@ if __name__=='__main__':
                 help='if running functional simulator backend')
     parser.add_argument('--prunefrac', type=float, default=0.0, 
                 help='pruning fraction to be applied to all layers')
+    parser.add_argument('--strategy', action='store', default='local', 
+                help='pruning strategy adopted', choices=['local', 'global', 'xbar'])
     
     # Dump simulation argumemts (command line and functional simulator config)
     args = parser.parse_args()
@@ -328,7 +331,7 @@ if __name__=='__main__':
     optimizer = optim.SGD(params, momentum=args.momentum, lr=args.lr, weight_decay=args.decay, nesterov=True,dampening=0)
     
     # Create directory to store tensorboard logs
-    exp_name = args.dataset + "-" + args.model + "-pf" + "-" + str(args.prunefrac)
+    exp_name = args.dataset + "-" + args.model + "-pf" + "-" + str({":0.2f"} .format(args.prunefrac))
     save_path = os.path.join(args.results_dir, exp_name)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -337,12 +340,22 @@ if __name__=='__main__':
         writer = SummaryWriter(save_path)
     
     # Prune original model (i.e. not model_mvm)
-    for name, module in model.module.named_modules(): # added module for dataParallel
-        if isinstance(module, torch.nn.Conv2d):
-            prune.l1_unstructured(module, name='weight', amount=args.prunefrac) # (use 0.2 to prune 20% weights)
-        elif isinstance(module, torch.nn.Linear):
-            prune.l1_unstructured(module, name='weight', amount=args.prunefrac)
+    if (args.strategy == 'local'):
+        for name, module in model.module.named_modules(): # added module for dataParallel
+            if (isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Linear)):
+                prune.l1_unstructured(module, name='weight', amount=args.prunefrac) # (use 0.2 to prune 20% weights)
+    elif (args.strategy == 'global'):
+        parameters_to_prune = []
+        for name, module in model.module.named_modules():
+            if (isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Linear)):
+                parameters_to_prune.append ((module, 'weight'))
+        prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured, amount=args.prunefrac)
+    elif (args.strategy == 'xbar'):
+        pass
+    else:
+        assert(0), "specified pruring strategy not supported"
 
+    sparsity_validate (model) # validate sparsity after pruning
     # print(dict(model.named_buffers()).keys())  # verify that all masks exist (masks are added as register_buffers)
     
     if (args.evaluate):
