@@ -152,11 +152,6 @@ def accuracy(output, target, topk=(1,)):
 
     res = []
     for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0)
+        correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
-
-    # kernel_img = model.features[0][0].kernel.data.clone()
-    # kernel_img.add_(-kernel_img.min())
-    # kernel_img.mul_(255 / kernel_img.max())
-    # save_image(kernel_img, 'kernel%s.jpg' % epoch)
