@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
+import os
 
 if_bit_slicing = True
 
@@ -21,6 +22,7 @@ ifglobal_acm_bits = val
 ifglobal_acm_bit_frac = val
 ifglobal_xbmodel = val
 ifglobal_xbmodel_weight_path = val
+ifglobal_dataset = True  # if True data collected from all layers
 
 ## Fixed point arithmetic configurations
 weight_bits = 16
@@ -43,6 +45,20 @@ acm_bit_frac = 24
 
 ## GENIEx configurations
 loop = False # executes GENIEx with batching when set to False
+
+## GENIEx data collection configuations
+dataset = True
+direc = 'geniex_dataset'  # folder containing geneix dataset
+rows = 2 # num of crossbars in row dimension
+cols = 2 # num of crossbars in col dimension
+Gon = 1/100
+Goff = 1/600
+Vmax =0.25
+
+# creating directory for dataset collection
+if dataset:
+    if not os.path.exists(direc):
+        os.mkdir(direc)    
 
 non_ideality = False
 class NN_model(nn.Module):
