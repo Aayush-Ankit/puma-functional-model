@@ -11,8 +11,9 @@ import time
 import sys
 torch.set_printoptions(threshold=10000)
 
-import config_dataset as cfg
-from src.mvm_v3 import *
+import src.config as cfg
+
+from geneix.mvm_dataset import *
 
 class Conv2d_mvm_function(Function):
 
@@ -96,8 +97,8 @@ class Conv2d_mvm_function(Function):
 
         shift_add_bit_stream= torch.pow(2*torch.ones(bit_stream_num).float(), bit_stream*torch.arange(0,bit_stream_num).float()).to(device)
         shift_add_bit_slice=  torch.pow(2*torch.ones(bit_slice_num).float(),  bit_slice*torch.arange(bit_slice_num-1, -1, -1).float()).to(device)
-        Gon = 1/100
-        Goff = 1/600
+        Gon = cfg.Gon
+        Goff = cfg.Goff
         Nstates_slice = 2**bit_slice-1        
         if bit_stream ==1:
             shift_add_bit_stream[-1] *= -1        # last bit --> subtract
@@ -142,17 +143,14 @@ class Conv2d_mvm_function(Function):
                 flatten_binary_input[:,:flatten_binary_input_temp.shape[1]] = flatten_binary_input_temp
                 flatten_binary_input_xbar = flatten_binary_input.reshape((input_batch*num_pixel, xbars.shape[1],cfg.xbar_row_size, bit_stream_num))  
                 
-                if cfg.non_ideality == True:
-                    xbars_out = mvm_tensor_nonid(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten0, G_real0, xbmodel, loop, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac) - \
-                                mvm_tensor_nonid(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten1, G_real1, xbmodel, loop, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac) 
-                else:
-                    dataset_ = dataset if (i==0 and j==0)or(i==output_row-1 and j== output_col-1) else False
-                    xbars_out = mvm_tensor(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, flatten_binary_input_xbar, flatten_input_sign_xbar, 
-                                           bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, 
-                                           acm_bit_frac, G_real0, dataset_) - \
-                                mvm_tensor(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, flatten_binary_input_xbar, flatten_input_sign_xbar,
-                                           bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, 
-                                           acm_bit_frac, G_real1, False)
+
+                dataset_ = dataset if (i==0 and j==0)or(i==output_row-1 and j== output_col-1) else False
+                xbars_out = mvm_tensor(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, flatten_binary_input_xbar, flatten_input_sign_xbar, 
+                                       bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, 
+                                       acm_bit_frac, G_real0, dataset_) - \
+                            mvm_tensor(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, flatten_binary_input_xbar, flatten_input_sign_xbar,
+                                       bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, 
+                                       acm_bit_frac, G_real1, False)
                                 
                 output[:,:,i*tile_row:(i+1)*tile_row,j*tile_col:(j+1)*tile_col] = xbars_out.reshape(tile_row, tile_col, input_batch, -1).permute(2,3,0,1)[:,:weight_channels_out,:,:]  ## #batchsize, # o/p channels, tile_row, tile_col 
                 
@@ -232,7 +230,7 @@ class _ConvNd_mvm(nn.Module):
             assert (self.xbmodel != None)
             assert (self.xbmodel_weight_path != None)
             self.xbmodel.load_state_dict(torch.load(self.xbmodel_weight_path)['state_dict'])
-        self.dataset = cfg.dataset # flag for dataset collection
+        self.dataset = cfg.dataset if cfg.ifglobal_dataset else xbmodel # flag for dataset collection
         self.tile_col = cfg.tile_col if cfg.ifglobal_tile_col else tile_col
         self.tile_row = cfg.tile_row if cfg.ifglobal_tile_row else tile_row
 
@@ -369,42 +367,18 @@ class Linear_mvm_function(Function):
         for i in range(bit_slice_num):
             shift_add_bit_slice[-i-1] = 2**(bit_slice*i)        
 
-        Gon = 1/100
-        Goff = 1/600
+        Gon = cfg.Gon
+        Goff = cfg.Goff
         Nstates_slice = 2**bit_slice-1           
         if bit_stream ==1:
             shift_add_bit_stream[-1] *= -1        # last bit --> subtract
             shift_add_bit_stream = shift_add_bit_stream.expand((input_batch, xbars_row, xbars_col, cfg.xbar_col_size//bit_slice_num, bit_stream_num)).transpose(3,4).to(device)
             shift_add_bit_slice = shift_add_bit_slice.expand((input_batch, xbars_row, xbars_col, cfg.xbar_col_size//bit_slice_num, bit_slice_num)).to(device)
             output_reg = torch.zeros(input_batch, xbars_row, xbars_col, bit_stream_num, cfg.xbar_col_size//bit_slice_num).to(device) # for 32-fixed  
-            if cfg.non_ideality == True:
-                output_analog = torch.zeros(input_batch, xbars_row, xbars_col, cfg.xbar_col_size).to(device)
-                Goffmat = Goff*torch.ones(input_batch, xbars_row, 1, cfg.xbar_row_size, 1).to(device)
-                G_real0 = (xbars[0]*(Gon - Goff)/Nstates_slice + Goff)
-                G_real_scaled0 = (G_real0-Goff)/(Gon-Goff)                
-                G_real_flatten0 = G_real_scaled0.permute(0,1,3,2).reshape(xbars_row,xbars_col,cfg.xbar_row_size*cfg.xbar_col_size).to(device)
-                G_real_flatten0 = G_real_flatten0.unsqueeze(3).expand(input_batch, xbars_row,xbars_col, cfg.xbar_row_size*cfg.xbar_col_size, 1).to(device)
-                
-                G_real1 = (xbars[1]*(Gon - Goff)/Nstates_slice + Goff)
-                G_real_scaled1 = (G_real1-Goff)/(Gon-Goff)                
-                G_real_flatten1 = G_real_scaled1.permute(0,1,3,2).reshape(xbars_row,xbars_col,cfg.xbar_row_size*cfg.xbar_col_size).to(device)
-                G_real_flatten1 = G_real_flatten1.unsqueeze(3).expand(input_batch, xbars_row,xbars_col, cfg.xbar_row_size*cfg.xbar_col_size, 1).to(device)                          
         else:
             shift_add_bit_stream = shift_add_bit_stream.expand((2, input_batch, xbars_row, xbars_col, cfg.xbar_col_size//bit_slice_num, bit_stream_num)).transpose(4,5).to(device)
             shift_add_bit_slice = shift_add_bit_slice.expand((2, input_batch, xbars_row, xbars_col, cfg.xbar_col_size//bit_slice_num, bit_slice_num)).to(device)
-            output_reg = torch.zeros(2, input_batch, xbars_row, xbars_col, bit_stream_num, cfg.xbar_col_size//bit_slice_num).to(device) 
-            if cfg.non_ideality == True:
-                output_analog = torch.zeros(2, input_batch, xbars_row, xbars_col, cfg.xbar_col_size).to(device)
-                Goffmat = Goff*torch.ones(2, input_batch, xbars_row, 1, cfg.xbar_row_size, 1).to(device)
-                G_real0 = (xbars[0]*(Gon - Goff)/Nstates_slice +Goff)
-                G_real_scaled0 = (G_real0-Goff)/(Gon-Goff)                
-                G_real_flatten0 = G_real_scaled0.permute(0,1,3,2).reshape(xbars_row,xbars_col,cfg.xbar_row_size*cfg.xbar_col_size).to(device)
-                G_real_flatten0 = G_real_flatten0.unsqueeze(3).expand(input_batch, xbars_row,xbars_col, cfg.xbar_row_size*cfg.xbar_col_size, 1).to(device)                
-
-                G_real1 = (xbars[1]*(Gon - Goff)/Nstates_slice +Goff)
-                G_real_scaled1 = (G_real1-Goff)/(Gon-Goff)                
-                G_real_flatten1 = G_real_scaled1.permute(0,1,3,2).reshape(xbars_row,xbars_col,cfg.xbar_row_size*cfg.xbar_col_size).to(device)
-                G_real_flatten1 = G_real_flatten1.unsqueeze(3).expand(input_batch, xbars_row,xbars_col, cfg.xbar_row_size*cfg.xbar_col_size, 1).to(device)   
+            output_reg = torch.zeros(2, input_batch, xbars_row, xbars_col, bit_stream_num, cfg.xbar_col_size//bit_slice_num).to(device)   
                 
         if cfg.non_ideality == True:
             xbars_out = mvm_tensor_nonid(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten0, G_real0, 
@@ -473,7 +447,7 @@ class Linear_mvm(nn.Module):
             assert (self.xbmodel != None)
             assert (self.xbmodel_weight_path != None)
             self.xbmodel.load_state_dict(torch.load(cfg.pretrained_model_path)['state_dict'])
-        self.dataset = cfg.dataset # flag for dataset collection
+        self.dataset = cfg.dataset if cfg.ifglobal_dataset else xbmodel # flag for dataset collection
 
     def forward(self, input):
         # See the autograd section for explanation of what happens here.
