@@ -7,8 +7,10 @@ import pdb
 
 import config as cfg
 
-if cfg.if_bit_slicing:
+if cfg.if_bit_slicing and not cfg.dataset:
     from src.pytorch_mvm_class_v3 import *
+elif cfg.dataset:
+    from geneix.pytorch_mvm_class_dataset import *   # import mvm class from geneix folder
 else:
     from src.pytorch_mvm_class_no_bitslice import *
 
