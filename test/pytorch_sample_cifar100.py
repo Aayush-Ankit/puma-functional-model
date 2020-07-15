@@ -78,7 +78,7 @@ def test(device):
         
         output = model(data_var)
         loss= criterion(output, target_var)
-        prec1, prec5 = accuracy(output.data, target_var.data, training, topk=(1, 5))
+        prec1, prec5 = accuracy(output.data, target_var.data, topk=(1, 5))
         losses.update(loss.data, data.size(0))
         top1.update(prec1[0], data.size(0))
         top5.update(prec5[0], data.size(0))
