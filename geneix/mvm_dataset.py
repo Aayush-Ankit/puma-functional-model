@@ -9,7 +9,7 @@ import os
 import argparse
 import pdb
 
-import config_dataset as cfg
+import src.config as cfg
 
 XBAR_ROW_SIZE = cfg.xbar_row_size
 XBAR_COL_SIZE = cfg.xbar_col_size
@@ -99,14 +99,15 @@ def float_to_16bits_tensor_fast(input, frac_bits, bit_slice, bit_slice_num, inpu
     del input
     return input_sliced.permute(1,2,0)
 
-def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, flatten_input, flatten_input_sign, bias_addr, 
-               xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bit, acm_bit_frac, dataset): 
+def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, flatten_input, flatten_input_sign, bias_addr, xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bit, acm_bit_frac, G_real, dataset): 
     xbars_row = xbars.shape[0]
     xbars_col = xbars.shape[1]
     batch_size = flatten_input.shape[0]
     bit_stream_num = input_bits//bit_stream
-
-    direc = 'aayush_spice_'+str(xbar_row_size)+'_stream'+str(bit_stream)+'slice'+str(bit_slice)+'_all_layers' 
+    Vmax = cfg.Vmax
+    Nstates_stream = 2**bit_stream-1
+    
+    direc = cfg.direc+'/spice_'+str(XBAR_ROW_SIZE)+'_stream'+str(bit_stream)+'slice'+str(bit_slice)+'_all_layers' 
     if not os.path.exists(direc):
         os.mkdir(direc)
     V=[]
@@ -117,14 +118,14 @@ def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, fla
             if dataset:
                 xbars_row1 = xbars.shape[0]
                 xbars_col1 = xbars.shape[1]  
-                xbars_row1 = 2 if xbars_row1 > 2 else xbars_row
-                xbars_col1 = 2 if xbars_col1 > 2 else xbars_col
+                xbars_row1 = cfg.rows if xbars_row1 > 2 else xbars_row  
+                xbars_col1 = cfg.cols if xbars_col1 > 2 else xbars_col
              
                 for xrow in range(xbars_row1):
                     for xcol in range(xbars_col1):                       
                         v_file_name = direc+'/dataset_V_'+str(XBAR_ROW_SIZE)+'stream'+str(bit_stream)+'slice'+str(bit_slice)+'.txt'
                         g_file_name = direc+'/dataset_G_'+str(XBAR_ROW_SIZE)+'stream'+str(bit_stream)+'slice'+str(bit_slice)+'.txt'
-                        G_real_flatten2 = G_real[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_ROW_SIZE).expand(batch_size, XBAR_ROW_SIZE*XBAR_ROW_SIZE)
+                        G_real_flatten2 = G_real[xrow,xcol].t().reshape(XBAR_ROW_SIZE*XBAR_COL_SIZE).expand(batch_size, XBAR_ROW_SIZE*XBAR_COL_SIZE)
                         V_real_flatten2 = V_real[:, xrow,:,i].view(batch_size,XBAR_ROW_SIZE)
                         V.append(V_real_flatten2.cpu().numpy())
                         G.append(G_real_flatten2.cpu().numpy())
