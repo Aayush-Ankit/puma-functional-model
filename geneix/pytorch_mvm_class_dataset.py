@@ -107,7 +107,6 @@ class Conv2d_mvm_function(Function):
             output_reg = torch.zeros(input_batch*num_pixel, xbars_row, xbars_col, bit_stream_num, cfg.xbar_col_size//bit_slice_num).to(device) # for 32-fixed  
             G_real0 = (xbars[0]*(Gon - Goff)/Nstates_slice + Goff)
             G_real1 = (xbars[1]*(Gon - Goff)/Nstates_slice + Goff)
-
         else:
             shift_add_bit_stream = shift_add_bit_stream.expand((2, input_batch*num_pixel, xbars_row, xbars_col, cfg.xbar_col_size//bit_slice_num, bit_stream_num)).transpose(4,5).to(device)
             shift_add_bit_slice = shift_add_bit_slice.expand((2, input_batch*num_pixel, xbars_row, xbars_col, cfg.xbar_col_size//bit_slice_num, bit_slice_num)).to(device)
@@ -375,24 +374,19 @@ class Linear_mvm_function(Function):
             shift_add_bit_stream = shift_add_bit_stream.expand((input_batch, xbars_row, xbars_col, cfg.xbar_col_size//bit_slice_num, bit_stream_num)).transpose(3,4).to(device)
             shift_add_bit_slice = shift_add_bit_slice.expand((input_batch, xbars_row, xbars_col, cfg.xbar_col_size//bit_slice_num, bit_slice_num)).to(device)
             output_reg = torch.zeros(input_batch, xbars_row, xbars_col, bit_stream_num, cfg.xbar_col_size//bit_slice_num).to(device) # for 32-fixed  
+            G_real0 = (xbars[0]*(Gon - Goff)/Nstates_slice + Goff)         
+            G_real1 = (xbars[1]*(Gon - Goff)/Nstates_slice + Goff)              
         else:
             shift_add_bit_stream = shift_add_bit_stream.expand((2, input_batch, xbars_row, xbars_col, cfg.xbar_col_size//bit_slice_num, bit_stream_num)).transpose(4,5).to(device)
             shift_add_bit_slice = shift_add_bit_slice.expand((2, input_batch, xbars_row, xbars_col, cfg.xbar_col_size//bit_slice_num, bit_slice_num)).to(device)
             output_reg = torch.zeros(2, input_batch, xbars_row, xbars_col, bit_stream_num, cfg.xbar_col_size//bit_slice_num).to(device)   
+            G_real0 = (xbars[0]*(Gon - Goff)/Nstates_slice +Goff)
+            G_real1 = (xbars[1]*(Gon - Goff)/Nstates_slice +Goff)
                 
-        if cfg.non_ideality == True:
-            xbars_out = mvm_tensor_nonid(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten0, G_real0, 
-                                       xbmodel, loop, binary_input, input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, 
-                                       input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac) - \
-                        mvm_tensor_nonid(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten1, G_real1, 
-                                       xbmodel, loop, binary_input, input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, 
-                                       input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac)
-
-        else:
             xbars_out = mvm_tensor(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, binary_input, input_sign_xbar, bias_addr, xbars[0],
-                                   bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, dataset) - \
+                                   bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, dataset, G_real0) - \
                         mvm_tensor(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, binary_input, input_sign_xbar, bias_addr, xbars[1], 
-                                   bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, dataset)
+                                   bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, dataset, G_real1)
 
         output = xbars_out[:, :weight_channels_out]
  
