@@ -47,10 +47,10 @@ acm_bit_frac = 24
 loop = False # executes GENIEx with batching when set to False
 
 ## GENIEx data collection configuations
-dataset = True
+dataset = False
 direc = 'geniex_dataset'  # folder containing geneix dataset
-rows = 2 # num of crossbars in row dimension
-cols = 2 # num of crossbars in col dimension
+rows = 1 # num of crossbars in row dimension
+cols = 1 # num of crossbars in col dimension
 Gon = 1/100
 Goff = 1/600
 Vmax =0.25
