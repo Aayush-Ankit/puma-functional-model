@@ -19,7 +19,6 @@ sys.path.insert(0, src_dir)
 import numpy as np
 import random
 import argparse
-import pdb
 
 import torch
 import torchvision
@@ -28,8 +27,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision.utils import save_image
-import torch.nn.utils.prune as prune
 from torch.utils.tensorboard import SummaryWriter
+
+import torch.nn.utils.prune as prune
+import pruning.prune as prune_custom # custom pruning
 
 #torch.set_default_tensor_type(torch.HalfTensor)
 
@@ -205,10 +206,10 @@ if __name__=='__main__':
     # new features
     parser.add_argument('--mvm', action='store_true', default=None,
                 help='if running functional simulator backend')
-    parser.add_argument('--prunefrac', type=float, default=0.0, 
+    parser.add_argument('--prunefrac', type=float, default=0.5, 
                 help='pruning fraction to be applied to all layers')
     parser.add_argument('--strategy', action='store', default='local', 
-                help='pruning strategy adopted', choices=['local', 'global', 'xbar'])
+                help='pruning strategy adopted', choices=['local', 'global', 'xbar-static', 'xbar-dynamic'])
     
     # Dump simulation argumemts (command line and functional simulator config)
     args = parser.parse_args()
@@ -331,7 +332,11 @@ if __name__=='__main__':
     optimizer = optim.SGD(params, momentum=args.momentum, lr=args.lr, weight_decay=args.decay, nesterov=True,dampening=0)
     
     # Create directory to store tensorboard logs
-    exp_name = args.dataset + "-" + args.model + "-pf" + "-" + str({":0.2f"} .format(args.prunefrac))
+    if (args.strategy in ["global", "local", "xbar-static"]):
+        exp_name = args.dataset + "-" + args.model + "-pf-" + str("{:0.2f}" .format(args.prunefrac))
+    else: # exp_name of xbar-dynamic is determined by the pretrained model and prunefrac
+        pretrained_model_name = args.pretrained.split("/")[-2]
+        exp_name = args.dataset + "-" + args.model + "-pf-" + str("{:0.2f}" .format(args.prunefrac)) + "-pre-" + pretrained_model_name
     save_path = os.path.join(args.results_dir, exp_name)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -350,8 +355,19 @@ if __name__=='__main__':
             if (isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Linear)):
                 parameters_to_prune.append ((module, 'weight'))
         prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured, amount=args.prunefrac)
-    elif (args.strategy == 'xbar'):
-        pass
+    elif ('xbar' in  args.strategy):
+        for name, module in model.module.named_modules(): # added module for dataParallel
+            if (isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Linear)):
+                # For unpruned networks
+                if (args.strategy == 'xbar-static'):
+                    # Here: threshold is interpreted as prune amount at xbar column level
+                    prune_custom.l1_xbar_unstructured(module, name='weight', threshold=args.prunefrac, xbar_strategy='static') # (use 0.5 on unpruned network to have all xbar columns to be 50% sparse)
+                # For previously pruned networks
+                elif (args.strategy == 'xbar-dynamic'):
+                    # Here: threshold is interpreted as prune threshold for xbar col outlier rejection
+                    prune_custom.l1_xbar_unstructured(module, name='weight', threshold=args.prunefrac, xbar_strategy='dynamic')
+                else:
+                    assert (0), "specified xbar pruning type not unsupported"
     else:
         assert(0), "specified pruring strategy not supported"
 

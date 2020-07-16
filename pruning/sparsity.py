@@ -10,6 +10,42 @@ torch.set_printoptions(threshold=10000)
 import pdb
 import src.config as cfg
 
+import json
+
+
+def adc_stats (s_dict, path="./"):
+    """ Dumps ADC resolution requirements of xbar columns
+    
+    Arguments:
+        s_tuple:
+            - dict -- dictionary of xbar-column wise sparsity
+    Returns:
+        None
+    """
+
+    adc_res = {'0':0, '-1':0, '-2':0, '-3':0, '-4':0, '-5': 0}
+    
+    for key, val in s_dict.items():
+        val_l = val.tolist()
+        for e in val_l:
+            if (e<0.50):
+                adc_res['0'] += 1
+            elif (e<0.75):
+                adc_res['-1'] += 1
+            elif (e<0.88):
+                adc_res['-2'] += 1
+            elif (e<0.94):
+                adc_res['-3'] += 1
+            elif (e<0.97):
+                adc_res['-4'] += 1
+            else:
+                adc_res['-5'] += 1
+    
+    filepath = path + 'adc_stats.json'
+    with open(filepath, 'w') as fp:
+        json.dump(adc_res, fp)
+
+
 def sparsity_plot (s_tuple, path="./", save=True):
     """ Plots layer-wise histogram of sparsity - matrix-level, xbar-level
 
@@ -22,7 +58,6 @@ def sparsity_plot (s_tuple, path="./", save=True):
     Returns:
         None
     """
-
     scale = 2.0
     fig = plt.figure(figsize=(8.0*scale, 5.0*scale))
     fig.suptitle("Distribution of sparsity across layers") # set global title for all sub-plots
@@ -41,8 +76,8 @@ def sparsity_plot (s_tuple, path="./", save=True):
         if (j > n1**2):
             break
         temp = fig.add_subplot(n1, n1, j)
-        temp.hist(s_tuple[1][key].numpy(), bins=10, density=True, label='matrix', histtype='bar')
-        temp.hist(s_tuple[2][key].numpy(), bins=10, density=True, label='xbar', histtype='bar')
+        temp.hist(s_tuple[1][key].numpy(), bins=20, density=True, label='matrix', histtype='bar', rwidth=1)
+        temp.hist(s_tuple[2][key].numpy(), bins=20, density=True, label='xbar', histtype='bar', rwidth=1)
         #temp.set_xlabel('Sparsity')
         #temp.set_ylabel('Dist')
         temp.legend(prop={'size': 10})

@@ -20,7 +20,6 @@ sys.path.insert(0, src_dir)
 import numpy as np
 import random
 import argparse
-import pdb
 
 import torch
 import torchvision.transforms as transforms
@@ -173,11 +172,14 @@ if __name__=='__main__':
 
     result = sparsity_metrics(model)
 
-    # save the sparsity plot in same path as pretrained model
+    # plot sparsity distribution in same path as pretrained model
     temp_l = args.pretrained.split("/")[0:-1] # remove .tar file from path
     filepath = ''
     for t in temp_l:
         filepath += (t+"/")
     sparsity_plot(result, path=filepath)
+
+    # dump adc_resolution stats in the same path as pretrained model
+    adc_stats(result[2], path=filepath)
     
     exit(0)
