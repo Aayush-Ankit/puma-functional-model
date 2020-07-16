@@ -1,12 +1,16 @@
 .*.sw*
+*.txt
+*.tar
+*.sh
+*.pyc
+
 __pycache__
+
+datasets/
+models/*.tar
+imodels/pretrained
+results/
 data/
 backup*
-stats.txt
-models/*.tar
-*.tar
+test/bug-report.py
 
-Datasets/
-results/
-
-*.pyc

@@ -3,8 +3,8 @@ import torch
 import torch.nn.functional as F
 import sys
 import time
-from pytorch_mvm_class import *
-__all__ = ['vgg_mvm']
+from src.pytorch_mvm_class import *
+__all__ = ['net']
 
 
   
@@ -380,7 +380,7 @@ class VGG_cifar100(vgg16):
 
 
 
-def vgg_mvm(ind,**kwargs):
+def net(ind,**kwargs):
     num_classes, depth, dataset = map(
         kwargs.get, ['num_classes', 'depth', 'dataset'])
     num_classes = 100
