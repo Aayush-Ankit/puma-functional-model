@@ -38,8 +38,10 @@ from utils.preprocess import get_transform
 from utils.utils import *
 import src.config as cfg
 
-if cfg.if_bit_slicing:
+if cfg.if_bit_slicing and not cfg.dataset:
     from src.pytorch_mvm_class_v3 import *
+elif cfg.dataset:
+    from geneix.pytorch_mvm_class_dataset import *   # import mvm class from geneix folder
 else:
     from src.pytorch_mvm_class_no_bitslice import *
 
@@ -73,10 +75,10 @@ def test(device):
     for batch_idx,(data, target) in enumerate(testloader):
         data_var = data.to(device)
         target_var = target.to(device)
-
+        
         output = model(data_var)
         loss= criterion(output, target_var)
-        prec1, prec5 = accuracy(output.data, target_var.data, training, topk=(1, 5))
+        prec1, prec5 = accuracy(output.data, target_var.data, topk=(1, 5))
         losses.update(loss.data, data.size(0))
         top1.update(prec1[0], data.size(0))
         top5.update(prec5[0], data.size(0))
