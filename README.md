@@ -7,7 +7,7 @@ Below you can find the system requirements and versions tested.
 | Requirement | Version                    |
 | ----------- | -------------------------- |
 | Python      | 3.7.3                      |
-| PyTorch      | 1.1.0                     |
+| PyTorch      | 1.5.1                     |
 
 
 ## Quick start
@@ -67,4 +67,4 @@ Note: resnet18_imnet_mvm.py has specifications for frac_bits for weights and inp
 
 ## Authors
 
-Aayush Ankit, Dong-Eun Kim
+Aayush Ankit, Dong-Eun Kim, Indranil Chakraborty, Mustafa Ali, Shubham Negi
