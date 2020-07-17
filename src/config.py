@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import os
 
 if_bit_slicing = True
+debug = True
 
 ## Use global parameters (below) for all layers or layer specific parameters
 val = True

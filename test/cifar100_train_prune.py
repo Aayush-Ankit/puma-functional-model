@@ -29,9 +29,6 @@ import torch.optim as optim
 from torchvision.utils import save_image
 from torch.utils.tensorboard import SummaryWriter
 
-import torch.nn.utils.prune as prune
-import pruning.prune as prune_custom # custom pruning
-
 #torch.set_default_tensor_type(torch.HalfTensor)
 
 # User-defined packages
@@ -40,6 +37,7 @@ from utils.data import get_dataset
 from utils.preprocess import get_transform
 from utils.utils import *
 from pruning.sparsity import *
+from pruning.utils import *
 import src.config as cfg
 
 if cfg.if_bit_slicing:
@@ -74,6 +72,7 @@ for path, dirs, files in os.walk(models_dir):
             model_names.append(file_n.split('.')[0])
     break # only traverse top level directory
 model_names.sort()
+
 
 # Runs one epoch of training on a model
 def train(epoch):
@@ -119,6 +118,7 @@ def train(epoch):
     #            epoch, acc, losses.avg))
     return acc, losses.avg
 
+
 # Run evaluation on a model (<model>.py)
 def test():
     print ("Testing...")
@@ -160,6 +160,7 @@ def test():
     #      .format(top1=top1, top5=top5))
     acc = top1.avg
     return acc, losses.avg
+
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
@@ -336,7 +337,7 @@ if __name__=='__main__':
         exp_name = args.dataset + "-" + args.model + "-pf-" + str("{:0.2f}" .format(args.prunefrac))
     else: # exp_name of xbar-dynamic is determined by the pretrained model and prunefrac
         pretrained_model_name = args.pretrained.split("/")[-2]
-        exp_name = args.dataset + "-" + args.model + "-pf-" + str("{:0.2f}" .format(args.prunefrac)) + "-pre-" + pretrained_model_name
+        exp_name = pretrained_model_name
     save_path = os.path.join(args.results_dir, exp_name)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -345,40 +346,18 @@ if __name__=='__main__':
         writer = SummaryWriter(save_path)
     
     # Prune original model (i.e. not model_mvm)
-    if (args.strategy == 'local'):
-        for name, module in model.module.named_modules(): # added module for dataParallel
-            if (isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Linear)):
-                prune.l1_unstructured(module, name='weight', amount=args.prunefrac) # (use 0.2 to prune 20% weights)
-    elif (args.strategy == 'global'):
-        parameters_to_prune = []
-        for name, module in model.module.named_modules():
-            if (isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Linear)):
-                parameters_to_prune.append ((module, 'weight'))
-        prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured, amount=args.prunefrac)
-    elif ('xbar' in  args.strategy):
-        for name, module in model.module.named_modules(): # added module for dataParallel
-            if (isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Linear)):
-                # For unpruned networks
-                if (args.strategy == 'xbar-static'):
-                    # Here: threshold is interpreted as prune amount at xbar column level
-                    prune_custom.l1_xbar_unstructured(module, name='weight', threshold=args.prunefrac, xbar_strategy='static') # (use 0.5 on unpruned network to have all xbar columns to be 50% sparse)
-                # For previously pruned networks
-                elif (args.strategy == 'xbar-dynamic'):
-                    # Here: threshold is interpreted as prune threshold for xbar col outlier rejection
-                    prune_custom.l1_xbar_unstructured(module, name='weight', threshold=args.prunefrac, xbar_strategy='dynamic')
-                else:
-                    assert (0), "specified xbar pruning type not unsupported"
-    else:
-        assert(0), "specified pruring strategy not supported"
-
-    sparsity_validate (model) # validate sparsity after pruning
-    # print(dict(model.named_buffers()).keys())  # verify that all masks exist (masks are added as register_buffers)
+    add_pruning (model, args.strategy, args.prunefrac)
+    # print(dict(model.module.named_buffers()).keys())  # verify that all masks exist (masks are added as register_buffers)
     
     if (args.evaluate):
         [test_acc, test_loss] = test()
         print ("Testing accuracy: ", test_acc)
     else:
         for epoch in range(0, args.epochs):
+
+            if (cfg.debug):
+                sparsity_validate (model) # validate sparsity after initial pruning (at each epoch)
+
             # adjust_learning_rate(optimizer, epoch)
             [train_acc, train_loss] = train(epoch)
             [test_acc, test_loss] = test()
@@ -399,15 +378,13 @@ if __name__=='__main__':
 
             isregular = (epoch % args.chpt_freq == 0) # model needs to be checkpointed regularly
             print("==> Saving for regular checkpointing")
-            # remove pruning
-            for name, module in model.module.named_modules(): # added module for dataParallel
-                if (isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Linear)):
-                    prune.remove(module, name='weight')
+            # remove pruning temporarily for checkpointing - ensureds models trained with and without pruning have same saved state
+            remove_pruning(model)
+            
             state['state_dict'] = model.module.state_dict()
             save_checkpoint(state, isbest, save_path, 'checkpoint.pth.tar', isregular)
-            # restore pruning
-            for name, module in model.module.named_modules(): # added module for dataParallel
-                if (isinstance(module, torch.nn.Conv2d) or isinstance(module, torch.nn.Linear)):
-                    prune.l1_unstructured(module, name='weight', amount=args.prunefrac)
+            
+            # restore pruning to continue training the previously pruned model (NOTE: pruning is done at start and not dynamically while retraining)
+            add_pruning (model, args.strategy, args.prunefrac)
     
     exit(0)

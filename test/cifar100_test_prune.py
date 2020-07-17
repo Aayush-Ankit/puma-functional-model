@@ -170,9 +170,11 @@ if __name__=='__main__':
     [test_acc, test_loss] = test()
     print ("Testing accuracy: ", test_acc)
 
+    #sparsity_validate(model)
+
     result = sparsity_metrics(model)
 
-    # plot sparsity distribution in same path as pretrained model
+    ## plot sparsity distribution in same path as pretrained model
     temp_l = args.pretrained.split("/")[0:-1] # remove .tar file from path
     filepath = ''
     for t in temp_l:

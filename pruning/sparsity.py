@@ -27,16 +27,16 @@ def adc_stats (s_dict, path="./"):
     
     for key, val in s_dict.items():
         val_l = val.tolist()
-        for e in val_l:
-            if (e<0.50):
+        for sparsity in val_l:
+            if (sparsity<1-1/2.0):
                 adc_res['0'] += 1
-            elif (e<0.75):
+            elif (sparsity<1-1/4.0):
                 adc_res['-1'] += 1
-            elif (e<0.88):
+            elif (sparsity<1-1/8.0):
                 adc_res['-2'] += 1
-            elif (e<0.94):
+            elif (sparsity<1-1/16.0):
                 adc_res['-3'] += 1
-            elif (e<0.97):
+            elif (sparsity<1-1/32.0):
                 adc_res['-4'] += 1
             else:
                 adc_res['-5'] += 1
@@ -64,7 +64,7 @@ def sparsity_plot (s_tuple, path="./", save=True):
     n = len(s_tuple[1].keys())
 
     # Use stride to plot selected layers
-    stride = 2
+    stride = 1
     n1 = math.floor(math.sqrt(n // stride))
 
     i,j = 0,0
@@ -76,8 +76,8 @@ def sparsity_plot (s_tuple, path="./", save=True):
         if (j > n1**2):
             break
         temp = fig.add_subplot(n1, n1, j)
-        temp.hist(s_tuple[1][key].numpy(), bins=20, density=True, label='matrix', histtype='bar', rwidth=1)
-        temp.hist(s_tuple[2][key].numpy(), bins=20, density=True, label='xbar', histtype='bar', rwidth=1)
+        #temp.hist(s_tuple[1][key].numpy(), bins=20, density=True, label='matrix', histtype='bar', rwidth=1)
+        temp.hist(s_tuple[2][key].numpy(), bins=20, range=(0,1), density=False, label='xbar', histtype='bar', rwidth=0.2)
         #temp.set_xlabel('Sparsity')
         #temp.set_ylabel('Dist')
         temp.legend(prop={'size': 10})

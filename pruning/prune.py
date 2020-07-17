@@ -75,16 +75,18 @@ class L1XbarUnstructured(prune.BasePruningMethod):
             sparsity, extra_zeros = _get_sparsity(col_t)
             if (xbar_strategy == 'dynamic'):
                 sparsity_out = sparsity
-                if (sparsity >= 0.5-threshold*(0.5-0.0) and sparsity <= 0.5):
-                    sparsity_out = 0.5
-                elif (sparsity >= 0.75-threshold*(0.75-0.5) and sparsity <= 0.75):
-                    sparsity_out = 0.75
-                elif (sparsity >= 0.88-threshold*(0.88-0.75) and sparsity <= 0.88):
-                    sparsity_out = 0.88
-                elif (sparsity >= 0.94-threshold*(0.94-0.88) and sparsity <= 0.94):
-                    sparsity_out = 0.94
-                elif (sparsity >= 0.97-threshold*(0.97-0.94) and sparsity <= 0.97):
-                    sparsity_out = 0.97
+                s = [1-1.0, 1-1.0/2, 1-1.0/4, 1-1.0/8, 1-1.0/16, 1-1.0/32]
+                if (sparsity >= s[1]-threshold*(s[1]-s[0]) and sparsity <= s[1]):
+                        sparsity_out = s[1]
+                elif (sparsity >= s[2]-threshold*(s[2]-s[1]) and sparsity <= s[2]):
+                        sparsity_out = s[2]
+                elif (sparsity >= s[3]-threshold*(s[3]-s[2]) and sparsity <= s[3]):
+                        sparsity_out = s[3]
+                elif (sparsity >= s[4]-threshold*(s[4]-s[3]) and sparsity <= s[4]):
+                        sparsity_out = s[4]
+                elif (sparsity >= s[5]-threshold*(s[5]-s[4]) and sparsity <= s[5]):
+                        sparsity_out = s[5]
+                assert (sparsity_out >= sparsity)
             else:
                 sparsity_out = threshold
 
