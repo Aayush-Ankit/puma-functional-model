@@ -12,5 +12,5 @@ imodels/pretrained
 results/
 data/
 backup*
-test/bug-report.py
+test/bug-report*.py
 

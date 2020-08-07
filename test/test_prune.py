@@ -123,19 +123,17 @@ if __name__=='__main__':
     print('Device available:', device)
     print('GPU Id(s) being used:', args.gpus)
 
-    print('==> Building model and model_mvm for', args.model, '...')
-    if (args.model in model_names and args.model+'_mvm' in model_names):
+    print('==> Building model for', args.model, '...')
+    if (args.model in model_names):
         model = (__import__(args.model)) #import module using the string/variable_name
-        model_mvm = (__import__(args.model+'_mvm'))
     else:
         raise Exception(args.model+'is currently not supported')
         
     # Extract the function capturing model definition
     model = model.net()
-    model_mvm = model_mvm.net(cfg.non_ideality)
     #print(model)
 
-    # Load parameters (to model and model_mvm) from a pretrained model
+    # Load parameters (to model) from a pretrained model
     print('==> Initializing model parameters ...')
     best_acc, best_train_acc = 0, 0
 

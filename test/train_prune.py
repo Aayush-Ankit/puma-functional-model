@@ -1,4 +1,4 @@
-### Script to train/retrain models with pruning 
+### Script to train/retrain models with pruning (unstructred - layer-wise, global, xbar-static, xbar-dynamic) 
 
 import os
 import sys
@@ -254,15 +254,20 @@ if __name__=='__main__':
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
                 weights_conv.append(m.weight.data.clone())
-            elif isinstance(m, nn.BatchNorm2d):
+            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
+                bn_data.append(m.weight.data.clone())
+                bn_bias.append(m.bias.data.clone())
+                running_mean.append(m.running_mean.data.clone())
+                running_var.append(m.running_var.data.clone())
+                num_batches.append(m.num_batches_tracked.clone())
             elif isinstance(m, nn.Linear):
-                    stdv = 1. / math.sqrt(m.weight.data.size(1))
-                    m.weight.data.uniform_(-stdv, stdv)
-                    weights_lin.append(m.weight.data.clone())
-                    if m.bias is not None:
-                       m.bias.data.uniform_(-stdv, stdv)
+                stdv = 1. / math.sqrt(m.weight.data.size(1))
+                m.weight.data.uniform_(-stdv, stdv)
+                weights_lin.append(m.weight.data.clone())
+                if m.bias is not None:
+                   m.bias.data.uniform_(-stdv, stdv)
     else:
         print('==> Load pretrained model form', args.pretrained, '...')
         pretrained_model = torch.load(args.pretrained)

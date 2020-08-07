@@ -51,7 +51,7 @@ Required model files:
 - resnet20_mvm.py
 - \_\_init\_\_.py
 
-Note: resnet20_mvm.py has specifications for frac_bits for weights and inputs. Please change it inside the file. 
+Note: resnet20_mvm.py has specifications for frac_bits for weights and inputs. Please change it inside the file.
 
 ImageNet
 ```bash
@@ -65,6 +65,6 @@ Required model files:
 Note: resnet18_imnet_mvm.py has specifications for frac_bits for weights and inputs. Please change it inside the file.
 
 
-## Authors
+## Contributors
 
 Aayush Ankit, Dong-Eun Kim, Indranil Chakraborty, Mustafa Ali, Shubham Negi
