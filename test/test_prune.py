@@ -14,7 +14,7 @@ sys.path.insert(0, root_dir) # 1 adds path to end of PYTHONPATH
 sys.path.insert(0, models_dir)
 sys.path.insert(0, datasets_dir)
 sys.path.insert(0, src_dir)
-#sys.path.insert(0, test_dir) 
+#sys.path.insert(0, test_dir)
 
 # Standard or Built-in packages
 import numpy as np
@@ -56,19 +56,19 @@ def test():
 
     for batch_idx,(data, target) in enumerate(testloader):
         t_start = time.time()
-        
+
         data, target = data.to(device), target.to(device)
-        
+
         output = model(data)
         loss= criterion(output, target)
-        
+
         prec1, prec5 = accuracy(output.data, target.data, topk=(1, 5))
         losses.update(loss.data, data.size(0))
         top1.update(prec1[0], data.size(0))
         top5.update(prec5[0], data.size(0))
 
         t_end = time.time()
-        
+
         if (batch_idx % args.log_freq == 0 or batch_idx == len(testloader)-1):
             print('[{0}/{1}({2:.0f}%)]\t'
                   'Time/Batch {3:4.2f}\t'
@@ -79,7 +79,7 @@ def test():
                    loss=losses, top1=top1, top5=top5))
             #if batch_idx == 10:
             #    break
-    
+
     #print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
     #      .format(top1=top1, top5=top5))
     acc = top1.avg
@@ -88,7 +88,7 @@ def test():
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     # training/test setup
-    parser.add_argument('-b', '--batch-size', default=512, type=int, metavar='N', 
+    parser.add_argument('-b', '--batch-size', default=512, type=int, metavar='N',
                 help='mini-batch size (default: 256)')
 
     # model/dataset etc
@@ -98,21 +98,21 @@ if __name__=='__main__':
                 help='name of the model')
     parser.add_argument('--pretrained', action='store', default=None,
                 help='the path to the pretrained model')
-    
+
     # result collection
     parser.add_argument('--log_freq', metavar='LOG', type=int, default=100,
                 help='frequency of loggin the result in terms of number of batches')
-    
+
     # others
     parser.add_argument('--input_size', type=int, default=None,
                 help='image input size')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='J',
                 help='number of data loading workers (default: 8)')
-    parser.add_argument('--gpus', default='0', 
+    parser.add_argument('--gpus', default='0',
                 help='gpu ids to be used for dataparallel (default: 0)')
-    
+
     # new features
-    
+
     # Dump simulation argumemts (command line and functional simulator config)
     args = parser.parse_args()
     print('==> Options:',args)
@@ -128,7 +128,7 @@ if __name__=='__main__':
         model = (__import__(args.model)) #import module using the string/variable_name
     else:
         raise Exception(args.model+'is currently not supported')
-        
+
     # Extract the function capturing model definition
     model = model.net()
     #print(model)
@@ -137,15 +137,15 @@ if __name__=='__main__':
     print('==> Initializing model parameters ...')
     best_acc, best_train_acc = 0, 0
 
-    if not args.pretrained:
-        assert (0), 'Provide a trained model path for evaluation'
-    else:
-        print('==> Load pretrained model form', args.pretrained, '...')
-        pretrained_model = torch.load(args.pretrained)
-        # best_acc = pretrained_model['best_acc']
-        model.load_state_dict(pretrained_model['state_dict'])
-    
-    # Setup dataset - transformation, dataloader 
+    #if not args.pretrained:
+    #    assert (0), 'Provide a trained model path for evaluation'
+    #else:
+    #    print('==> Load pretrained model form', args.pretrained, '...')
+    #    pretrained_model = torch.load(args.pretrained)
+    #    # best_acc = pretrained_model['best_acc']
+    #    model.load_state_dict(pretrained_model['state_dict'])
+
+    # Setup dataset - transformation, dataloader
     default_transform = {
         'train': get_transform(args.dataset,
                                input_size=args.input_size, augment=True),
@@ -161,10 +161,11 @@ if __name__=='__main__':
         num_workers=args.workers, pin_memory=True)
 
     criterion = nn.CrossEntropyLoss()
-    
+
     model.to(device)#.half() # uncomment for FP16
     #model = torch.nn.DataParallel(model)
-    
+
+    """
     [test_acc, test_loss] = test()
     print ("Testing accuracy: ", test_acc)
 
@@ -181,5 +182,41 @@ if __name__=='__main__':
 
     # dump adc_resolution stats in the same path as pretrained model
     adc_stats(result[2], path=filepath)
-    
-    exit(0)
+    """
+
+    #exit(0)
+
+    # Plot histogram for ASPLOS'21 paper - collect data for 50% pruning across local, and all xbar-dyn configs
+    exp_l = ['local', 'xbar-dynamic-th-0.25', 'xbar-dynamic-th-0.50', 'xbar-dynamic-th-1.0']
+    conv2_col_sparsity_l = []
+
+    for exp in exp_l:
+        print ("Experiment name: ", exp_l)
+        path = "../../hpca21-results/imagenet/"
+        pretrained = path + exp + "/imagenet-resnet18-pf-0.50/model_best.pth.tar"
+        pretrained_model = torch.load(pretrained)
+        model.load_state_dict(pretrained_model['state_dict'])
+        result = sparsity_metrics(model)
+        conv2_col_sparsity_l.append(result[2]['conv2'])
+
+    import matplotlib.pyplot as plt
+    plt.rcParams.update({'font.size': 14})
+
+
+    scale = 2.0
+    fig = plt.figure(figsize=(4*scale, 1.5*scale))
+
+    name_l = ["sparse-50%", "outlier-th-0.25", "outlier-th-0.5", "outlier-th-1.0"]
+    for i in range(len(exp_l)):
+        temp = fig.add_subplot(1, len(exp_l), i+1)
+        temp.hist(conv2_col_sparsity_l[i].numpy(), bins=20, range=(0,1), density=False, label='column sparsity', histtype='bar', rwidth=0.4)
+        temp.set_title(name_l[i])
+        if (i==0):
+            temp.set_ylabel("Distribution")
+        temp.set_xlabel("Col sparsity")
+
+    plt.tight_layout()
+    plt.savefig("sparsity-dist.pdf")
+
+
+

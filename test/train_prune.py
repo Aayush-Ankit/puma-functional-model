@@ -1,4 +1,4 @@
-### Script to train/retrain models with pruning (unstructred - layer-wise, global, xbar-static, xbar-dynamic) 
+### Script to train/retrain models with pruning (unstructred - layer-wise, global, xbar-static, xbar-dynamic)
 
 import os
 import sys
@@ -13,7 +13,7 @@ sys.path.insert(0, root_dir) # 1 adds path to end of PYTHONPATH
 sys.path.insert(0, models_dir)
 sys.path.insert(0, datasets_dir)
 sys.path.insert(0, src_dir)
-#sys.path.insert(0, test_dir) 
+#sys.path.insert(0, test_dir)
 
 # Standard or Built-in packages
 import numpy as np
@@ -82,11 +82,17 @@ def train(epoch):
     top1 = AverageMeter()
     top5 = AverageMeter()
 
+    t_start = 0
+    t_tot = 0
+    t_gpu = 0
+
     for batch_idx, (inputs, target) in enumerate(trainloader):
+        t_prev = t_start
         t_start = time.time()
-        
+        t_tot += (t_start-t_prev)
+
         data, target = inputs.to(device), target.to(device)
-        
+
         optimizer.zero_grad()
         output = model(data)
         loss = criterion(output, target)
@@ -99,11 +105,17 @@ def train(epoch):
         top5.update(prec5[0], inputs.size(0))
 
         t_end = time.time()
+        t_gpu += (t_end-t_start)
 
         if (not args.evaluate):
-            writer.add_scalars('Train', {'top1':top1.avg, 'top5':top5.avg, 'loss':losses.avg}, epoch*len(trainloader)+batch_idx) 
-        
+            writer.add_scalars('Train', {'top1':top1.avg, 'top5':top5.avg, 'loss':losses.avg}, epoch*len(trainloader)+batch_idx)
+
         if (batch_idx % args.log_freq == 0 or batch_idx == len(trainloader)-1):
+            print ("time-total ", t_tot/100.0)
+            print ("time-gpu ", t_gpu/100.0)
+            t_tot = 0
+            t_gpu = 0
+
             print('Epoch: [{0}][{1}/{2}({3:.0f}%)]\t'
                   'Time/Batch {4:4.2}\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
@@ -129,22 +141,22 @@ def test():
 
     for batch_idx,(data, target) in enumerate(testloader):
         t_start = time.time()
-        
+
         data, target = data.to(device), target.to(device)
-        
+
         output = model(data)
         loss= criterion(output, target)
-        
+
         prec1, prec5 = accuracy(output.data, target.data, topk=(1, 5))
         losses.update(loss.data, data.size(0))
         top1.update(prec1[0], data.size(0))
         top5.update(prec5[0], data.size(0))
 
         t_end = time.time()
-        
+
         if (not args.evaluate):
-            writer.add_scalars('Validation', {'top1':top1.avg, 'top5':top5.avg, 'loss':losses.avg}, epoch*len(trainloader)+batch_idx) 
-        
+            writer.add_scalars('Validation', {'top1':top1.avg, 'top5':top5.avg, 'loss':losses.avg}, epoch*len(trainloader)+batch_idx)
+
         if (batch_idx % args.log_freq == 0 or batch_idx == len(testloader)-1):
             print('[{0}/{1}({2:.0f}%)]\t'
                   'Time/Batch {3:4.2f}\t'
@@ -155,7 +167,7 @@ def test():
                    loss=losses, top1=top1, top5=top5))
             #if batch_idx == 10:
             #    break
-    
+
     #print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
     #      .format(top1=top1, top5=top5))
     acc = top1.avg
@@ -165,7 +177,7 @@ def test():
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     # training/test setup
-    parser.add_argument('-b', '--batch-size', default=512, type=int, metavar='N', 
+    parser.add_argument('-b', '--batch-size', default=512, type=int, metavar='N',
                 help='mini-batch size (default: 256)')
     parser.add_argument('--lr', action='store', type=float, default='1e-4',
                 help='the intial learning rate')
@@ -185,7 +197,7 @@ if __name__=='__main__':
                 help='name of the model')
     parser.add_argument('--pretrained', action='store', default=None,
                 help='the path to the pretrained model')
-    
+
     # result collection
     parser.add_argument('--results_dir', metavar='RESULTS_DIR', default='../../results',
                 help='results dir')
@@ -195,23 +207,23 @@ if __name__=='__main__':
                 help='frequency of loggin the result in terms of number of batches')
     parser.add_argument('--chpt_freq', metavar='checkpoint', type=int, default=40,
                 help='frequency of checkpointing the model in terms of number of epochs')
-    
+
     # others
     parser.add_argument('--input_size', type=int, default=None,
                 help='image input size')
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='J',
                 help='number of data loading workers (default: 8)')
-    parser.add_argument('--gpus', default='0', 
+    parser.add_argument('--gpus', default='0',
                 help='gpu ids to be used for dataparallel (default: 0)')
-    
+
     # new features
     parser.add_argument('--mvm', action='store_true', default=None,
                 help='if running functional simulator backend')
-    parser.add_argument('--prunefrac', type=float, default=0.5, 
+    parser.add_argument('--prunefrac', type=float, default=0.5,
                 help='pruning fraction to be applied to all layers')
-    parser.add_argument('--strategy', action='store', default='local', 
+    parser.add_argument('--strategy', action='store', default='local',
                 help='pruning strategy adopted', choices=['local', 'global', 'xbar-static', 'xbar-dynamic'])
-    
+
     # Dump simulation argumemts (command line and functional simulator config)
     args = parser.parse_args()
     print('==> Options:',args)
@@ -229,7 +241,7 @@ if __name__=='__main__':
         model_mvm = (__import__(args.model+'_mvm'))
     else:
         raise Exception(args.model+'is currently not supported')
-        
+
     # Extract the function capturing model definition
     model = model.net()
     model_mvm = model_mvm.net(cfg.non_ideality)
@@ -306,11 +318,11 @@ if __name__=='__main__':
     # Move required model to GPU (if applicable)
     if args.mvm:
         model = model_mvm
-        
+
     model.to(device)#.half() # uncomment for FP16
     model = torch.nn.DataParallel(model)
-    
-    # Setup dataset - transformation, dataloader 
+
+    # Setup dataset - transformation, dataloader
     default_transform = {
         'train': get_transform(args.dataset,
                                input_size=args.input_size, augment=True),
@@ -318,7 +330,7 @@ if __name__=='__main__':
                               input_size=args.input_size, augment=False)
     }
     transform = getattr(model, 'input_transform', default_transform)
-    
+
     train_data = get_dataset(args.dataset, 'train', transform['train'])
     trainloader = torch.utils.data.DataLoader(
         train_data,
@@ -336,7 +348,7 @@ if __name__=='__main__':
     params = model.parameters()
     #optimizer = optim.Adam(params, lr=args.lr, weight_decay=args.weight_decay)
     optimizer = optim.SGD(params, momentum=args.momentum, lr=args.lr, weight_decay=args.decay, nesterov=True,dampening=0)
-    
+
     # Create directory to store tensorboard logs
     if (args.strategy in ["global", "local", "xbar-static"]):
         exp_name = args.dataset + "-" + args.model + "-pf-" + str("{:0.2f}" .format(args.prunefrac))
@@ -346,14 +358,14 @@ if __name__=='__main__':
     save_path = os.path.join(args.results_dir, exp_name)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    
+
     if (not args.evaluate): # Log simulation only for training/retraining
         writer = SummaryWriter(save_path)
-    
+
     # Prune original model (i.e. not model_mvm)
     add_pruning (model, args.strategy, args.prunefrac)
     # print(dict(model.module.named_buffers()).keys())  # verify that all masks exist (masks are added as register_buffers)
-    
+
     if (args.evaluate):
         [test_acc, test_loss] = test()
         print ("Testing accuracy: ", test_acc)
@@ -366,16 +378,16 @@ if __name__=='__main__':
             # adjust_learning_rate(optimizer, epoch)
             [train_acc, train_loss] = train(epoch)
             [test_acc, test_loss] = test()
-            
+
             # checkpoint model (best of regular)
             state = {
-                'epoch': epoch, 
-                'best_acc': best_acc, 
+                'epoch': epoch,
+                'best_acc': best_acc,
                 'test_acc': test_acc,
                 'state_dict': model.module.state_dict(), # module for dataParallel
                 'optimizer_state_dict': optimizer.state_dict()
             }
-            
+
             isbest = test_acc > best_acc # best model needs to be checkpointed
             if (isbest):
                 best_acc = test_acc
@@ -385,11 +397,11 @@ if __name__=='__main__':
             print("==> Saving for regular checkpointing")
             # remove pruning temporarily for checkpointing - ensureds models trained with and without pruning have same saved state
             remove_pruning(model)
-            
+
             state['state_dict'] = model.module.state_dict()
             save_checkpoint(state, isbest, save_path, 'checkpoint.pth.tar', isregular)
-            
+
             # restore pruning to continue training the previously pruned model (NOTE: pruning is done at start and not dynamically while retraining)
             add_pruning (model, args.strategy, args.prunefrac)
-    
+
     exit(0)
