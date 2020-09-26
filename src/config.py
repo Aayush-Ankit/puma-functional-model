@@ -79,7 +79,8 @@ class NN_model(nn.Module):
         out = self.fc3(out)
         return out
 
-#xbmodel = NN_model(xbar_row_size)
+#xbmodel = NN_model(xbar_row_size) #uncomment for FP16
+#xbmodel = NN_model(xbar_row_size) #uncomment for FP32
 xbmodel = None
 #xbmodel_weight_path = 'xb_models/XB_'+str(xb_size)+'_stream1slice2.pth.tar'
 xbmodel_weight_path = None

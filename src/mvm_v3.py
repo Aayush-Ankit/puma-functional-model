@@ -84,20 +84,25 @@ def bit_slicing(weight, frac_bit, bit_slice, weight_bits):  # version 2
     return bitslice
 
 def float_to_16bits_tensor_fast(input, frac_bits, bit_slice, bit_slice_num, input_bits): # input is batch x n tensor / output is n x 16 tensor..
-    int_bit = input_bits - frac_bits -1 # extra -1 for sign bit
-    #clamp data into the available range
-    input = torch.clamp(input, -2**int_bit, 2**int_bit-1/2**frac_bits)
-    #normalize
-    input = input.div_(2**int_bit)
-    #left shift all the fracional values so that all 16 bits comes to the left of decimal
-    input = input.mul_(2**(input_bits-1))
-    #take the integer part of the input, which represents our 16bit number
-    input = torch.floor(input)
-    #divide by scalar to get the decimal representation back, MSB----->LSB
-    input_sliced = torch.stack([torch.floor(torch.div(input, 2**(i*bit_slice))) - \
-                                torch.mul(torch.floor(torch.div(input, 2**((i+1)*bit_slice))), 2**bit_slice) for i in range(bit_slice_num-1,-1,-1) ])
-    del input
-    return input_sliced.permute(1,2,0)
+
+    if(input_bits==1): # (NOTE) assuming inputs are binary
+       return input.unsqueeze(-1)
+    else:
+
+        int_bit = input_bits - frac_bits -1 # extra -1 for sign bit
+        #clamp data into the available range
+        input = torch.clamp(input, -2**int_bit, 2**int_bit-1/2**frac_bits)
+        #normalize
+        input = input.div_(2**int_bit)
+        #left shift all the fracional values so that all 16 bits comes to the left of decimal
+        input = input.mul_(2**(input_bits-1))
+        #take the integer part of the input, which represents our 16bit number
+        input = torch.floor(input)
+        #divide by scalar to get the decimal representation back, MSB----->LSB
+        input_sliced = torch.stack([torch.floor(torch.div(input, 2**(i*bit_slice))) - \
+                                    torch.mul(torch.floor(torch.div(input, 2**((i+1)*bit_slice))), 2**bit_slice) for i in range(bit_slice_num-1,-1,-1) ])
+        del input
+        return input_sliced.permute(1,2,0)
 
 def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, flatten_input, flatten_input_sign, bias_addr, 
                xbars, bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bit, acm_bit_frac): 
@@ -118,17 +123,16 @@ def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, fla
             output_analog = torch.sum(output_analog,3)
             output_analog = torch.clamp(output_analog, min=0, max=2**adc_bit-1)
             #####
+            output_analog = output_analog.type(torch.float)
             output_analog=output_analog.reshape(shift_add_bit_slice.shape)  # for 32-fixed
             output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_bit_slice), 4)
 
         output = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 3)
-
-        #output = output.float() # uncomment for FP16 (ops on 128, 129 fail without float)
         output.div_(2**(input_bit_frac + weight_bit_frac - acm_bit_frac)).trunc_()
         output.fmod_(2**acm_bit).div_(2**acm_bit_frac)
 
         # + sum xbar_rows
-        output = torch.sum(output, 1).reshape(batch_size, -1).type(torch.float)
+        output = torch.sum(output, 1).reshape(batch_size, -1) 
     else:
         input_pos = torch.where(flatten_input_sign == 1, flatten_input, zeros)
         input_neg = flatten_input.sub(input_pos)
@@ -140,12 +144,12 @@ def mvm_tensor(zeros, shift_add_bit_stream, shift_add_bit_slice, output_reg, fla
             output_analog = torch.mul(xbars, input_stream)
             output_analog = torch.sum(output_analog,4)      #sum it along the row dim
             ####
+            output_analog = output_analog.type(torch.float)
             output_analog=output_analog.reshape(shift_add_bit_slice.shape)
             output_reg[:,:,:,:,i,:] = torch.sum(torch.mul(output_analog, shift_add_bit_slice), 5) # -1 # adding across bit sliced dimension
 
         output_split = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 4)
 
-        #output_split = output_split.float() # uncomment for FP16 (ops on 149, 150 fail without float)
         output_split.div_(2**(input_bit_frac + weight_bit_frac - acm_bit_frac)).trunc_()
         output_split.fmod_(2**acm_bit).div_(2**acm_bit_frac)
 
@@ -164,11 +168,11 @@ def mvm_tensor_nonid(zeros, shift_add_bit_stream, shift_add_bit_slice, output_re
     # flatten_input shape:  [batch_size, xbars_row, XBAR_ROW_SIZE, 16]
     # 2-bit bit-slicing
 
-    Gon = 1/100
-    Goff = 1/600
+    Gon = cfg.Gon
+    Goff = cfg.Goff
     Nstates_slice = 2**bit_slice-1
     Nstates_stream = 2**bit_stream-1
-    Vmax = 0.25
+    Vmax = cfg.Vmax
 #    Goffmat = Goff*torch.ones(XBAR_ROW_SIZE,XBAR_COL_SIZE).to(device)
     Comp_factor = Nstates_slice*Nstates_stream/((Gon-Goff)*Vmax)
     inmax_V = Vmax
@@ -271,7 +275,7 @@ def mvm_tensor_nonid(zeros, shift_add_bit_stream, shift_add_bit_slice, output_re
         for i in range(bit_stream_num): # 16bit input
             V_real_loop = V_real[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))   #V_real.shape batchsize, xbar_rows, xbarsize, num_bitstreams
             V_real_scaled_loop = V_real_scaled[:,:,:,-1-i].reshape((batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
-            output_bias_all = torch.sum(torch.mul(Goffmat,V_real_loop),3).unsqueeze(3).expand(batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1)
+            output_bias_all = torch.sum(torch.mul(Goffmat,V_real_loop),3).unsqueeze(3).expand(batch_size, xbars_row, 1, XBAR_COL_SIZE, 1)
             output_real_out= torch.mul(G_real, V_real_loop)
             output_real_out = torch.sum(output_real_out,3)
             if cfg.loop == True:
@@ -282,7 +286,7 @@ def mvm_tensor_nonid(zeros, shift_add_bit_stream, shift_add_bit_slice, output_re
                         
                         output_niratio = model(input_VG)
                         output_niratio_unscale = (output_niratio) * (inmax_test - inmin_test )  + inmin_test
-                        output_bias = output_bias_all[:, xrow, 0].view(batch_size,XBAR_ROW_SIZE)
+                        output_bias = output_bias_all[:, xrow, 0].view(batch_size,XBAR_COL_SIZE)
                         output_nonideal = (output_real-output_bias).div(output_niratio_unscale)
                         output_analog_xbar_real = ((output_nonideal)*Comp_factor)
     
@@ -295,20 +299,23 @@ def mvm_tensor_nonid(zeros, shift_add_bit_stream, shift_add_bit_slice, output_re
                 input_VG_flatten = input_VG.permute(1,2,0,3,4).reshape(batch_size*input_VG.shape[1]*input_VG.shape[2], input_VG.shape[3])
                 output_niratio = model(input_VG_flatten)
                 output_niratio_unscale = (output_niratio) * in_diff + inmin_test
-                output_bias = output_bias_all.expand(batch_size, output_bias_all.shape[1], xbars_col, XBAR_ROW_SIZE, 1).permute(1,2, 0,3,4).reshape(batch_size*xbars_row*xbars_col,XBAR_ROW_SIZE)
+                output_bias = output_bias_all.expand(batch_size, output_bias_all.shape[1], xbars_col, XBAR_COL_SIZE, 1).permute(1,2, 0,3,4).reshape(batch_size*xbars_row*xbars_col,XBAR_ROW_SIZE)
                 output_analog_xbar = (output_real-output_bias).div(output_niratio_unscale)
                 
                 output_analog = torch.stack(torch.split(((output_analog_xbar)*Comp_factor),batch_size,dim=0)).reshape(xbars_row, xbars_col, batch_size, XBAR_COL_SIZE).permute(2,0,1,3)
                         
             #####
+            output_analog = torch.round(output_analog) #ADC quantization
+            output_analog = torch.clamp(output_analog, min=0, max=2**adc_bit-1)
             output_analog_=output_analog.reshape(shift_add_bit_slice.shape)
+            output_analog_ = output_analog_.float()
             output_reg[:,:,:,i,:] = torch.sum(torch.mul(output_analog_, shift_add_bit_slice), 4)
 
         output = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 3)
 
         output.div_(2**(input_bit_frac + weight_bit_frac - acm_bit_frac)).trunc_()
         output.fmod_(2**acm_bit).div_(2**acm_bit_frac)
-        output = torch.sum(output, 1).reshape(batch_size, -1).type(torch.float)
+        output = torch.sum(output, 1).reshape(batch_size, -1)
     else:
         for i in range(bit_stream_num): # 16bit input
             V_real_loop = V_real[:,:,:,:,-1-i].reshape((2, batch_size, xbars_row, 1, XBAR_ROW_SIZE, 1))
@@ -340,7 +347,10 @@ def mvm_tensor_nonid(zeros, shift_add_bit_stream, shift_add_bit_slice, output_re
                     output_analog_xbar = (output_real-output_bias).div(output_niratio_unscale)
                     output_analog[xsign, :] = torch.stack(torch.split(((output_analog_xbar)*Comp_factor),batch_size,dim=0)).reshape(xbars_row, xbars_col, batch_size, XBAR_COL_SIZE).permute(2,0,1,3)
             
+            output_analog = torch.round(output_analog) #ADC quantization
+            output_analog = torch.clamp(output_analog, min=0, max=2**adc_bit-1)
             output_analog_ = output_analog.reshape(shift_add_bit_slice.shape)
+            output_analog_ = output_analog_.float()
             output_reg[:,:,:,:,i,:] = torch.sum(torch.mul(output_analog_, shift_add_bit_slice), 5) # -1
         
         output_split = torch.sum(torch.mul(output_reg, shift_add_bit_stream), 4)
