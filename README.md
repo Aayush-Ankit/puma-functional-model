@@ -39,6 +39,11 @@ python pytorch_sample_cifar100.py -b <batch_size> --pretrained <my_trained_model
 | acm_bit_frac    | # of bits for fraction partof output         |  16 -> 12 / 32 -> 24 |
 
 
+## HalfTensor Support
+Gives at least 25% speedup with minimal change in accuracy (~0.1%). To enable, uncomment the following:
+- src/pytorch_mvm_class_v3.py : Lines with '#uncomment for FP16' under Conv2d_mvm and Linear_mvm functions to set default tensor to torch.half()
+- src/config.py : Change the geniex model to .half() when using non_ideality=True 
+
 ## Running NN models
 
 CIFAR-100:

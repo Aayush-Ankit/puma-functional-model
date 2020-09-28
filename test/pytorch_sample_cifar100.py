@@ -158,7 +158,7 @@ if __name__=='__main__':
     if not args.pretrained:
         raise Exception('Provide pretrained model for evalution')
     else:
-        print('==> Load pretrained model form', args.pretrained, '...')
+        print('==> Load pretrained model from', args.pretrained, '...')
         pretrained_model = torch.load(args.pretrained)
         best_acc = pretrained_model['best_acc']
         model.load_state_dict(pretrained_model['state_dict'])
@@ -190,8 +190,7 @@ if __name__=='__main__':
             m.running_var.data = running_var[j]
             m.num_batches_tracked = num_batches[j]
             j = j+1
-        #elif isinstance(m, Linear_mvm):
-        elif isinstance(m, nn.Linear):
+        elif isinstance(m, Linear_mvm):
             m.weight.data = weights_lin[k]
             k=k+1
 
@@ -223,5 +222,9 @@ if __name__=='__main__':
 
     criterion = nn.CrossEntropyLoss()
 
+    begin = time.time()
+
     test(device)
+    end = time.time()
+    print('Total time:',end-begin)
     exit(0)

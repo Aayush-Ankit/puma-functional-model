@@ -23,7 +23,7 @@ class Conv2d_mvm_function(Function):
     # +--------------------------+
     def forward(ctx, input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, tile_row=2, tile_col=2, xbmodel=None, xbmodel_weight_path=None):
        
-        #torch.set_default_tensor_type(torch.HalfTensor)
+        #torch.set_default_tensor_type(torch.HalfTensor) #uncomment for FP16
         ## fixed-16: 
         ## sign     : 1 
         ## integer  : 3
@@ -79,7 +79,7 @@ class Conv2d_mvm_function(Function):
         input_pad[:,:,padding[0]:input_row-padding[0],padding[1]:input_col-padding[1]] = input
         pos = torch.ones(input_batch*num_pixel, input_channels*weight_row*weight_col).to(device)
         neg = pos.clone().fill_(0)
-        
+
         output_row = (input_row - weight_row)//stride[0] + 1
         output_col = (input_col - weight_col)//stride[1] + 1 
         output = torch.zeros((input_batch, weight_channels_out, output_row, output_col)).to(device)
@@ -96,14 +96,16 @@ class Conv2d_mvm_function(Function):
 
         shift_add_bit_stream= torch.pow(2*torch.ones(bit_stream_num).float(), bit_stream*torch.arange(0,bit_stream_num).float()).to(device)
         shift_add_bit_slice=  torch.pow(2*torch.ones(bit_slice_num).float(),  bit_slice*torch.arange(bit_slice_num-1, -1, -1).float()).to(device)
-        Gon = 1/100
-        Goff = 1/600
-        Nstates_slice = 2**bit_slice-1        
+        Gon = cfg.Gon
+        Goff = cfg.Goff
+        Nstates_slice = 2**bit_slice-1  
+
         if bit_stream ==1:
-            shift_add_bit_stream[-1] *= -1        # last bit --> subtract
+            if input_bits != 1:
+                shift_add_bit_stream[-1] *= -1        # last bit --> subtract
             shift_add_bit_stream = shift_add_bit_stream.expand((input_batch*num_pixel, xbars_row, xbars_col, cfg.xbar_col_size//bit_slice_num, bit_stream_num)).transpose(3,4).to(device)
             shift_add_bit_slice = shift_add_bit_slice.expand((input_batch*num_pixel, xbars_row, xbars_col, cfg.xbar_col_size//bit_slice_num, bit_slice_num)).to(device)
-            output_reg = torch.zeros(input_batch*num_pixel, xbars_row, xbars_col, bit_stream_num, cfg.xbar_col_size//bit_slice_num).to(device) # for 32-fixed  
+            output_reg = torch.zeros(input_batch*num_pixel, xbars_row, xbars_col, bit_stream_num, cfg.xbar_col_size//bit_slice_num).float().to(device) # for 32-fixed  
             if cfg.non_ideality == True:
                 output_analog = torch.zeros(input_batch*num_pixel, xbars_row, xbars_col, cfg.xbar_col_size).to(device)
                 Goffmat = Goff*torch.ones(input_batch*num_pixel, xbars_row, 1, cfg.xbar_row_size, 1).to(device)
@@ -150,7 +152,7 @@ class Conv2d_mvm_function(Function):
         assert output_row%tile_row == 0 and output_col%tile_col == 0, "Output feature map size should be multiple of tile size"
         for i in range(math.ceil(output_row/tile_row)):
             for j in range(math.ceil(output_col/tile_col)):
-                input_temp = unfold(input_pad[:,:, stride_input_row*i:stride_input_row*i+input_patch_row, stride_input_col*j:stride_input_col*j+input_patch_col]).permute(2,0,1) # #patches, batchsize, k^2*I
+                input_temp = unfold(input_pad[:,:, stride_input_row*i:stride_input_row*i+input_patch_row, stride_input_col*j:stride_input_col*j+input_patch_col]).permute(2,0,1).float() # #patches, batchsize, k^2*I
                 input_temp = input_temp.reshape(input_batch*num_pixel,-1)          #new_batch_size = batch_size*#_of_output_pixel    
                 if bit_stream >1:
                     flatten_input_sign = torch.where(input_temp > 0, pos, neg).expand(bit_stream_num,-1,-1).permute(1, 2, 0) 
@@ -164,10 +166,10 @@ class Conv2d_mvm_function(Function):
                 
                 if cfg.non_ideality == True:
                     xbars_out = mvm_tensor_nonid(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten0, G_real0, 
-                                               xbmodel, loop, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, 
+                                               xbmodel, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, 
                                                weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac) - \
                                 mvm_tensor_nonid(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten1, G_real1, 
-                                               xbmodel, loop, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, 
+                                               xbmodel, flatten_binary_input_xbar, flatten_input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, 
                                                weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac) 
                 else:
                     xbars_out = mvm_tensor(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, flatten_binary_input_xbar, flatten_input_sign_xbar, 
@@ -176,9 +178,8 @@ class Conv2d_mvm_function(Function):
                                 mvm_tensor(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, flatten_binary_input_xbar, flatten_input_sign_xbar,
                                            bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, 
                                            acm_bit_frac)
-                                
+
                 output[:,:,i*tile_row:(i+1)*tile_row,j*tile_col:(j+1)*tile_col] = xbars_out.reshape(tile_row, tile_col, input_batch, -1).permute(2,3,0,1)[:,:weight_channels_out,:,:]  ## #batchsize, # o/p channels, tile_row, tile_col 
-                
         ctx.save_for_backward(input, weight, bias)
         ctx.stride = stride
         ctx.padding = padding 
@@ -309,7 +310,7 @@ class Conv2d_mvm(_ConvNd_mvm):
 
         super(Conv2d_mvm, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
-            False, _pair(0), groups, bias, padding_mode,
+            False, _pair(0), groups, bias, padding_mode, check_grad,
             bit_slice, bit_stream, weight_bits, weight_bit_frac, input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac, tile_row, tile_col, xbmodel, xbmodel_weight_path)
     #@weak_script_method
     def forward(self, input):
@@ -324,6 +325,8 @@ class Linear_mvm_function(Function):
     # bias is an optional argument
     def forward(ctx, input, weight, bias=None, 
                 bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, xbmodel=None, xbmodel_weight_path=None):
+
+        #torch.set_default_tensor_type(torch.HalfTensor) #uncomment for FP16
 
         if weight_bit_frac == -1:
             weight_bit_frac = weight_bits//4*3
@@ -381,6 +384,8 @@ class Linear_mvm_function(Function):
             input_sign_xbar = input_sign_temp.reshape(input_batch, xbars.shape[1],cfg.xbar_row_size, bit_stream_num)
             input.abs_()
 
+        input = input.float()
+
         binary_input[:,:input.shape[1]] = float_to_16bits_tensor_fast(input, input_bit_frac, bit_stream, bit_stream_num, input_bits)   # batch x n x 16
 
         binary_input = binary_input.reshape((input_batch, xbars.shape[1], cfg.xbar_row_size, bit_stream_num))
@@ -390,15 +395,15 @@ class Linear_mvm_function(Function):
         xbars_col = xbars.shape[2]    
          
         zero_mvmtensor = torch.zeros(input_batch, xbars.shape[1],cfg.xbar_row_size, bit_stream_num).to(device)
-        shift_add_bit_stream = torch.zeros(bit_stream_num) # input bits = 16
+        shift_add_bit_stream = torch.zeros(bit_stream_num).float() # input bits = 16
         for i in range(bit_stream_num):
             shift_add_bit_stream[i] = 2**(bit_stream*i)
-        shift_add_bit_slice = torch.zeros(bit_slice_num) # 16bit / 2bit-slice
+        shift_add_bit_slice = torch.zeros(bit_slice_num).float() # 16bit / 2bit-slice
         for i in range(bit_slice_num):
             shift_add_bit_slice[-i-1] = 2**(bit_slice*i)        
 
-        Gon = 1/100
-        Goff = 1/600
+        Gon = cfg.Gon
+        Goff = cfg.Goff
         Nstates_slice = 2**bit_slice-1           
         if bit_stream ==1:
             shift_add_bit_stream[-1] *= -1        # last bit --> subtract
@@ -436,10 +441,10 @@ class Linear_mvm_function(Function):
                 
         if cfg.non_ideality == True:
             xbars_out = mvm_tensor_nonid(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten0, G_real0, 
-                                       xbmodel, loop, binary_input, input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, 
+                                       xbmodel, binary_input, input_sign_xbar, bias_addr, xbars[0], bit_slice, bit_stream, weight_bits, weight_bit_frac, 
                                        input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac) - \
                         mvm_tensor_nonid(zero_mvmtensor, shift_add_bit_stream, shift_add_bit_slice, output_reg, output_analog, Goffmat, G_real_flatten1, G_real1, 
-                                       xbmodel, loop, binary_input, input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, 
+                                       xbmodel, binary_input, input_sign_xbar, bias_addr, xbars[1], bit_slice, bit_stream, weight_bits, weight_bit_frac, 
                                        input_bits, input_bit_frac, adc_bit, acm_bits, acm_bit_frac)
 
         else:
@@ -473,15 +478,15 @@ class Linear_mvm_function(Function):
         return grad_input, grad_weight, grad_bias, None, None, None, None, None, None, None, None, None, None, None 
 
 class Linear_mvm(nn.Module):
-    def __init__(self, input_features, output_features, bias=True,
+    def __init__(self, in_features, out_features, bias=True,
                  bit_slice=2, bit_stream=1, weight_bits=16, weight_bit_frac=-1, input_bits=16, input_bit_frac=-1, adc_bit=-1, acm_bits=16, acm_bit_frac=-1, xbmodel=None, xbmodel_weight_path=None):
         super(Linear_mvm, self).__init__()
-        self.input_features = input_features
-        self.output_features = output_features
+        self.in_features = in_features
+        self.out_features = out_features
         
-        self.weight = nn.Parameter(torch.Tensor(output_features, input_features))
+        self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
         if bias:
-            self.bias = nn.Parameter(torch.Tensor(output_features))
+            self.bias = nn.Parameter(torch.Tensor(out_features))
             self.bias.data.uniform_(-0.1, 0.1) 
         else:
             self.register_parameter('bias', None)
@@ -501,7 +506,7 @@ class Linear_mvm(nn.Module):
         if (cfg.non_ideality):
             assert (self.xbmodel != None)
             assert (self.xbmodel_weight_path != None)
-            self.xbmodel.load_state_dict(torch.load(cfg.pretrained_model_path)['state_dict'])
+            self.xbmodel.load_state_dict(torch.load(cfg.xbmodel_weight_path)['state_dict'])
 
     def forward(self, input):
         # See the autograd section for explanation of what happens here.
@@ -512,5 +517,5 @@ class Linear_mvm(nn.Module):
         # (Optional)Set the extra information about this module. You can test
         # it by printing an object of this class.
         return 'in_features={}, out_features={}, bias={}'.format(
-            self.input_features, self.output_features, self.bias is not None
+            self.in_features, self.out_features, self.bias is not None
         )

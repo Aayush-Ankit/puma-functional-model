@@ -211,8 +211,7 @@ class ResNet_cifar100(resnet):
         #########Layer################ 
         self.avgpool=nn.AvgPool2d(8)
         self.bn20= nn.BatchNorm1d(64*self.inflate)
-        #self.fc=Linear_mvm(64*self.inflate,num_classes, bias=False) 
-        self.fc=nn.Linear(64*self.inflate,num_classes, bias=False) 
+        self.fc=Linear_mvm(64*self.inflate,num_classes, bias=False) 
         self.bn21= nn.BatchNorm1d(num_classes)
         self.logsoftmax=nn.LogSoftmax()
 
